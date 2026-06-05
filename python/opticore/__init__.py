@@ -4,12 +4,12 @@ OptiCore — High-performance options pricing, IV solver, and Greeks.
 Quick start:
     >>> import opticore as oc
     >>> oc.price(spot=100, strike=105, expiry=0.5, rate=0.05, vol=0.20, kind="call")
-    3.444...
-    >>> oc.iv(price=3.44, spot=100, strike=105, expiry=0.5, rate=0.05, kind="call")
-    0.1998...
+    4.581...
+    >>> oc.iv(price=4.582, spot=100, strike=105, expiry=0.5, rate=0.05, kind="call")
+    0.2000...
     >>> g = oc.greeks(spot=100, strike=105, expiry=0.5, rate=0.05, vol=0.20, kind="call")
     >>> g.delta
-    0.4405...
+    0.4611...
 """
 
 __version__ = "0.2.0"
@@ -118,7 +118,7 @@ def price(
     --------
     >>> import opticore as oc
     >>> oc.price(spot=100, strike=105, expiry=0.5, rate=0.05, vol=0.20, kind="call")
-    3.444...
+    4.581...
 
     >>> import numpy as np
     >>> strikes = np.arange(90, 111, dtype=float)
@@ -227,8 +227,8 @@ def iv(
     Examples
     --------
     >>> import opticore as oc
-    >>> oc.iv(price=3.44, spot=100, strike=105, expiry=0.5, rate=0.05, kind="call")
-    0.1998...
+    >>> oc.iv(price=4.582, spot=100, strike=105, expiry=0.5, rate=0.05, kind="call")
+    0.2000...
     """
     is_call = _parse_kind(kind)
 
@@ -293,7 +293,7 @@ def greeks(
     >>> import opticore as oc
     >>> g = oc.greeks(spot=100, strike=105, expiry=0.5, rate=0.05, vol=0.20, kind="call")
     >>> g.delta
-    0.4405...
+    0.4611...
     """
     is_call = _parse_kind(kind)
     result = _greeks_scalar(

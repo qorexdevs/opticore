@@ -35,11 +35,11 @@ import opticore as oc
 
 # Price a European call
 price = oc.price(spot=100, strike=105, expiry=0.5, rate=0.05, vol=0.20, kind="call")
-# => 3.444
+# => 4.582
 
 # Implied volatility (Jaeckel's "Let's Be Rational" — full machine precision)
-iv = oc.iv(price=3.44, spot=100, strike=105, expiry=0.5, rate=0.05, kind="call")
-# => 0.1998
+iv = oc.iv(price=4.582, spot=100, strike=105, expiry=0.5, rate=0.05, kind="call")
+# => 0.2000
 
 # All Greeks in one pass
 g = oc.greeks(spot=100, strike=105, expiry=0.5, rate=0.05, vol=0.20, kind="call")
