@@ -64,7 +64,7 @@ This roadmap reflects *intent*, not a promise. Scope for each phase is locked wh
 - ✅ `notebooks/01_quickstart.ipynb`
 - ✅ `notebooks/02_ibkr_setup.ipynb`
 - ✅ `notebooks/03_yfinance_tutorial.ipynb`
-- ⬜ `notebooks/04_iv_analysis.ipynb`
+- ✅ `notebooks/04_iv_analysis.ipynb`
 - ⬜ `notebooks/05_strategies.ipynb`
 - ✅ README polish (badges, honest perf table, install matrix)
 - ✅ Sample chain shipped with the package (`provider="sample"`)

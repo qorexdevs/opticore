@@ -51,7 +51,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   ~2 ms (was ~100 ms). NaN propagation handles unsolvable rows naturally,
   removing the bare `except Exception` that was hiding errors (#25).
 
+### Fixed
+- `notebooks/03_yfinance_tutorial.ipynb` still referenced the old `model_price`
+  column (renamed to `theo_price`, see #10); the consistency-check cell raised
+  `KeyError` when run against the current code.
+
 ### Added
+- **`notebooks/04_iv_analysis.ipynb`** - IV-analysis walkthrough on the bundled
+  sample chain: per-expiry smiles, 25-delta risk reversal, ATM term structure,
+  put-call parity as a no-arb check, implied forwards / dividend yield, and the
+  mispricing screen. Runs fully offline - no account, no network.
 - **Type stubs for `chain` and `plot` modules** (#30) - adds
   `python/opticore/chain.pyi` and `python/opticore/plot.pyi` so mypy /
   IDE users see real types (not `Any`) for `oc.fetch_chain`, `oc.enrich`,
