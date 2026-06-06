@@ -43,15 +43,15 @@ This roadmap reflects *intent*, not a promise. Scope for each phase is locked wh
 - ✅ C++ reference-value tests to 1e-12
 - ✅ Python accuracy tests mirroring C++ (133 assertions)
 - ✅ Python chain + plot tests
-- ⬜ Mock IBKR adapter for offline CI
-- ⬜ Hypothesis property-based tests
-- ⬜ `pytest-benchmark` suite for perf tracking
-- ⬜ Coverage gate ≥ 85%
+- ⬜ Mock IBKR adapter for offline CI ([#1](https://github.com/qorexdevs/opticore/issues/1))
+- ✅ Hypothesis property-based tests
+- ✅ `pytest-benchmark` suite for perf tracking
+- ✅ Coverage gate ≥ 85% (enforced in CI on the canonical job)
 
-### Packaging / infrastructure — ⬜ planned
-- ⬜ GitHub Actions CI (matrix: 3.10–3.13 × linux/macos/windows)
-- ⬜ Wheel building via `cibuildwheel`
-- ⬜ `.pyi` type stubs + `py.typed` marker
+### Packaging / infrastructure — 🟡 in progress
+- ✅ GitHub Actions CI (matrix: 3.10–3.13 × linux/macos/windows)
+- ✅ Wheel building via `cibuildwheel`
+- ✅ `.pyi` type stubs + `py.typed` marker
 - ⬜ PyPI release (after wheels work)
 - ⬜ GitHub Pages docs (mkdocs-material or pdoc)
 
@@ -61,8 +61,8 @@ This roadmap reflects *intent*, not a promise. Scope for each phase is locked wh
 - ✅ `notebooks/02_ibkr_setup.ipynb`
 - ⬜ `notebooks/03_iv_analysis.ipynb`
 - ⬜ `notebooks/04_strategies.ipynb`
-- ⬜ README polish (badges, honest perf table, install matrix)
-- ⬜ Sample chain shipped with the package
+- ✅ README polish (badges, honest perf table, install matrix)
+- ✅ Sample chain shipped with the package (`provider="sample"`)
 
 ### Out of scope for Phase 1 — ❌
 - American options (early exercise)

@@ -17,12 +17,14 @@
 | | OptiCore | QuantLib | py_vollib | FinancePy |
 |---|---------|----------|-----------|-----------|
 | **Install** | `pip install opticore` | Compile from source + SWIG | `pip install` | `pip install` |
-| **Price 10k options** | < 1 ms | ~50 ms | ~200 ms | ~100 ms |
+| **Price 10k options** | 0.65 ms* | ~50 ms | 40 ms* | ~100 ms |
 | **IV precision** | 64-bit machine ε | 1e-8 | 64-bit (with Numba) | 1e-6 |
 | **API style** | `oc.price(spot=100, ...)` | 15 lines of boilerplate | Function-based | OOP |
 | **Greeks in 1 call** | ✅ All 5 | Manual per-Greek | ✅ | ✅ |
 | **IBKR integration** | ✅ Built-in | ❌ | ❌ | ❌ |
 | **License** | Apache-2.0 | BSD | MIT | GPL-3.0 |
+
+\* measured with `pytest-benchmark`, see [Benchmarks](#benchmarks). QuantLib/FinancePy numbers are rough published figures, not measured by us.
 
 ## Quickstart
 
@@ -134,6 +136,31 @@ oc.greeks() ──→  _core.so  ──→  greeks.cpp    (analytic, single pass
 - **C++20 core** — all numerical work: BSM pricing, Jaeckel IV solver, analytic Greeks
 - **nanobind** — zero-copy NumPy ↔ C++ bridge (4× faster compile, 5× smaller binary than pybind11)
 - **Python layer** — type handling, DataFrames, plotting, IBKR adapter
+
+## Benchmarks
+
+Measured with `pytest-benchmark` on an i5-11400F, Windows, Python 3.12. The 10k chain
+is 10,000 options with random strikes (70-130), expiries (0.05-2y), and vols (10-50%).
+
+| Benchmark | Mean | Per option |
+|---|---|---|
+| Scalar `oc.price()` | 7.0 µs | 7.0 µs |
+| Batch price, 10k options | 0.65 ms | 65 ns |
+| Batch IV solve, 10k options | 6.8 ms | 0.68 µs |
+| Price + all 5 Greeks (`greeks_table`), 10k | 1.0 ms | 0.10 µs |
+| py_vollib scalar loop, 10k options | 40 ms | 4.0 µs |
+
+Two honest caveats:
+
+- For a **single scalar call**, py_vollib is actually ~2x faster (4 µs vs 7 µs) — at
+  that size both are dominated by Python call overhead, not math. OptiCore's win is
+  vectorization: hand it arrays and the whole chain prices in one C++ pass.
+- Numbers vary by machine. Reproduce yours with:
+
+```bash
+pip install pytest-benchmark py_vollib
+pytest tests/python/test_benchmarks.py -m benchmark --benchmark-only
+```
 
 ## Building from Source
 
