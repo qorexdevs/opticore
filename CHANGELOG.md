@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-06-07
+
 ### Changed
 - **`oc.price()` vectorized path is ~8x faster for varying-vol inputs.** The
   general broadcast case (array `vol` and/or `spot`) used to fall back to a
@@ -43,6 +45,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   namespace. To see them, opt in once: `logging.basicConfig(level=logging.INFO)`.
   Notebooks/scripts that relied on the old prints will go silent - this is
   intentional; libraries shouldn't pollute stdout.
+- **Breaking (keyword arg):** `oc.iv(price_val=...)` -> `oc.iv(price=...)` to
+  match the docstring and notebooks. Positional calls are unaffected.
+- `plot.payoff` param `spot_range` is now `Optional[tuple[float, float]]`
+  (was implicitly Optional - PEP 484 no longer allows that).
+- `enrich()`'s internal `greek_cols` dict now has an explicit type annotation.
 
 ### Performance
 - **`enrich()` is now ~50x faster** on real-sized chains (#21). Replaced the
@@ -108,20 +115,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **yfinance provider** for `oc.fetch_chain()` - no account, no subscription,
   ~15-min delayed Yahoo data. Use via `provider="yfinance"`. Install with
   `pip install opticore[data-yfinance]`. IBKR remains the primary provider.
-
-### Added
 - Type stubs (`__init__.pyi`, `_core.pyi`) and `py.typed` marker for PEP 561
   compliance. IDEs and `mypy` now see real types for all public functions
   instead of `Any`, including `pd.DataFrame` returns and NumPy array overloads.
 - `[tool.mypy]` config in `pyproject.toml`; `mypy` runs clean on
   `python/opticore` + `tests/python`.
-
-### Changed
-- **Breaking (keyword arg):** `oc.iv(price_val=...)` -> `oc.iv(price=...)` to
-  match the docstring and notebooks. Positional calls are unaffected.
-- `plot.payoff` param `spot_range` is now `Optional[tuple[float, float]]`
-  (was implicitly Optional - PEP 484 no longer allows that).
-- `enrich()`'s internal `greek_cols` dict now has an explicit type annotation.
 
 ## [0.2.0] - 2026-04-XX
 

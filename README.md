@@ -5,8 +5,8 @@
 [![PyPI](https://img.shields.io/pypi/v/opticore.svg)](https://pypi.org/project/opticore/)
 [![Python](https://img.shields.io/pypi/pyversions/opticore.svg)](https://pypi.org/project/opticore/)
 [![Downloads](https://static.pepy.tech/badge/opticore/month)](https://pepy.tech/project/opticore)
-[![CI](https://github.com/vivek-varma/opticore/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/vivek-varma/opticore/actions/workflows/ci.yml)
-[![codecov](https://codecov.io/gh/vivek-varma/opticore/branch/main/graph/badge.svg)](https://codecov.io/gh/vivek-varma/opticore)
+[![CI](https://github.com/qorexdevs/opticore/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/qorexdevs/opticore/actions/workflows/ci.yml)
+[![codecov](https://codecov.io/gh/qorexdevs/opticore/branch/main/graph/badge.svg)](https://codecov.io/gh/qorexdevs/opticore)
 [![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
 [![C++20](https://img.shields.io/badge/C%2B%2B-20-blue.svg)]()
 
@@ -209,7 +209,7 @@ Apache-2.0 — use freely in commercial and open-source projects.
 
 ## Star history
 
-[![Star history](https://api.star-history.com/svg?repos=vivek-varma/opticore&type=Date)](https://star-history.com/#vivek-varma/opticore&Date)
+[![Star history](https://api.star-history.com/svg?repos=qorexdevs/opticore&type=Date)](https://star-history.com/#qorexdevs/opticore&Date)
 
 ---
 

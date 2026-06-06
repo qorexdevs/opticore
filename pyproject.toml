@@ -4,8 +4,8 @@ build-backend = "scikit_build_core.build"
 
 [project]
 name = "opticore"
-version = "0.2.0"
-description = "High-performance options pricing, IV solver, and Greeks — C++20 core with Pythonic API"
+version = "0.3.0"
+description = "High-performance options pricing, IV solver, and Greeks - C++20 core with Pythonic API"
 readme = "README.md"
 license = {text = "Apache-2.0"}
 requires-python = ">=3.10"
@@ -47,10 +47,10 @@ dev = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/vivek-varma/opticore"
-Repository = "https://github.com/vivek-varma/opticore"
-Issues = "https://github.com/vivek-varma/opticore/issues"
-Changelog = "https://github.com/vivek-varma/opticore/blob/main/CHANGELOG.md"
+Homepage = "https://github.com/qorexdevs/opticore"
+Repository = "https://github.com/qorexdevs/opticore"
+Issues = "https://github.com/qorexdevs/opticore/issues"
+Changelog = "https://github.com/qorexdevs/opticore/blob/main/CHANGELOG.md"
 
 [tool.scikit-build]
 minimum-version = "0.9"
