@@ -8,6 +8,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Changed
+- **`oc.price()` vectorized path is ~8x faster for varying-vol inputs.** The
+  general broadcast case (array `vol` and/or `spot`) used to fall back to a
+  Python loop of per-element scalar nanobind calls; it now goes through a
+  single `_bsm_price_batch_full` C++ call (10k options: 5.4 ms → 0.65 ms).
+  The fast path for scalar spot+vol is unchanged. README gained a measured
+  Benchmarks section to back the perf claims.
 - **Breaking — `expiry` column is now `pd.Timestamp` (UTC midnight)** (#24).
   Both `fetch_chain` providers (`ibkr`, `yfinance`) now emit `expiry` as a
   timezone-aware `pd.Timestamp` instead of a `"YYYYMMDD"` string. This makes

@@ -7,7 +7,7 @@ see through the Python wrappers in `opticore/__init__.py` without treating the
 C++ module as `Any`.
 
 Could be auto-generated via `python -m nanobind.stubgen -m opticore._core`,
-but hand-writing is fine given the small surface (6 functions).
+but hand-writing is fine given the small surface (7 functions).
 """
 
 from __future__ import annotations
@@ -57,6 +57,15 @@ def _bsm_price_batch(
     vol: float,
     div_yield: float = ...,
     is_call: bool = ...,
+) -> NDArray[np.float64]: ...
+def _bsm_price_batch_full(
+    spot: NDArray[np.float64],
+    strike: NDArray[np.float64],
+    expiry: NDArray[np.float64],
+    rate: float,
+    vol: NDArray[np.float64],
+    div_yield: float = ...,
+    is_call: NDArray[np.bool_] = ...,
 ) -> NDArray[np.float64]: ...
 def _implied_vol_batch(
     price: NDArray[np.float64],

@@ -21,6 +21,7 @@ import numpy as np
 # Import C++ core (compiled via nanobind)
 from opticore._core import (
     _bsm_price_batch,
+    _bsm_price_batch_full,
     _bsm_price_scalar,
     _greeks_batch,
     _greeks_scalar,
@@ -164,24 +165,24 @@ def price(
                 )
             )
 
-    # General case: element-wise
+    # General case: single C++ batch call over fully broadcast arrays
     spot_a = np.broadcast_to(spot_a, n).copy().astype(np.float64)
     strike_a = np.broadcast_to(strike_a, n).copy().astype(np.float64)
     expiry_a = np.broadcast_to(expiry_a, n).copy().astype(np.float64)
     vol_a = np.broadcast_to(vol_a, n).copy().astype(np.float64)
+    ic = np.full(n, is_call, dtype=bool)
 
-    result = np.empty(n, dtype=np.float64)
-    for i in range(n):
-        result[i] = _bsm_price_scalar(
-            spot_a[i],
-            strike_a[i],
-            expiry_a[i],
+    return np.asarray(
+        _bsm_price_batch_full(
+            spot_a,
+            strike_a,
+            expiry_a,
             float(rate),
-            vol_a[i],
+            vol_a,
             float(div_yield),
-            is_call,
+            ic,
         )
-    return result
+    )
 
 
 # ════════════════════════════════════════════════════════════════════════════

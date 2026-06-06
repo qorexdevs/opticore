@@ -66,6 +66,30 @@ NB_MODULE(_core, m) {
         "Batch price with scalar spot/rate/vol and array strike/expiry."
     );
 
+    m.def("_bsm_price_batch_full",
+        [](nb::ndarray<double, nb::ndim<1>, nb::c_contig> spot,
+           nb::ndarray<double, nb::ndim<1>, nb::c_contig> strike,
+           nb::ndarray<double, nb::ndim<1>, nb::c_contig> expiry,
+           double rate,
+           nb::ndarray<double, nb::ndim<1>, nb::c_contig> vol,
+           double div_yield,
+           nb::ndarray<bool, nb::ndim<1>, nb::c_contig> is_call) {
+
+            size_t n = spot.shape(0);
+            double* result = new double[n];
+            opticore::bsm_price_batch(
+                spot.data(), strike.data(), expiry.data(),
+                rate, vol.data(), div_yield, is_call.data(), result, n
+            );
+
+            nb::capsule owner(result, [](void* p) noexcept { delete[] static_cast<double*>(p); });
+            return nb::ndarray<nb::numpy, double, nb::ndim<1>>(result, {n}, owner);
+        },
+        "spot"_a, "strike"_a, "expiry"_a, "rate"_a, "vol"_a,
+        "div_yield"_a = 0.0, "is_call"_a = true,
+        "Batch price with array spot/strike/expiry/vol."
+    );
+
     // ════════════════════════════════════════════════════════════════════
     // Implied volatility
     // ════════════════════════════════════════════════════════════════════
