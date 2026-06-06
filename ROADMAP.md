@@ -34,6 +34,10 @@ This roadmap reflects *intent*, not a promise. Scope for each phase is locked wh
 - ✅ Ephemeral connection lifecycle ([ADR-0004](docs/decisions/0004-ephemeral-ibkr-connection.md))
 - ⬜ Live smoke test on paper account (GH issue)
 
+### yfinance adapter — ✅ done
+- ✅ `fetch_yfinance_chain()` — free delayed data, no account or gateway needed
+- ✅ Wired into `oc.fetch_chain(symbol, provider="yfinance")`
+
 ### Plotting — ✅ done
 - ✅ `oc.plot.smile()` — IV smile by expiry
 - ✅ `oc.plot.payoff(legs)` — multi-leg payoff diagram
@@ -59,8 +63,9 @@ This roadmap reflects *intent*, not a promise. Scope for each phase is locked wh
 - ✅ `AGENT.md`, `ROADMAP.md`, ADRs
 - ✅ `notebooks/01_quickstart.ipynb`
 - ✅ `notebooks/02_ibkr_setup.ipynb`
-- ⬜ `notebooks/03_iv_analysis.ipynb`
-- ⬜ `notebooks/04_strategies.ipynb`
+- ✅ `notebooks/03_yfinance_tutorial.ipynb`
+- ⬜ `notebooks/04_iv_analysis.ipynb`
+- ⬜ `notebooks/05_strategies.ipynb`
 - ✅ README polish (badges, honest perf table, install matrix)
 - ✅ Sample chain shipped with the package (`provider="sample"`)
 
@@ -70,7 +75,7 @@ This roadmap reflects *intent*, not a promise. Scope for each phase is locked wh
 - Vol surface fitting (SVI, SABR, SSVI)
 - Monte Carlo pricing
 - Exotics: barriers, Asians, lookbacks
-- Non-IBKR data providers
+- Data providers beyond IBKR and yfinance (Polygon, Deribit, CBOE — Phase 4)
 - Portfolio / strategy optimizer
 - Web UI / hosted service
 
@@ -82,7 +87,7 @@ Phase 1 is "done" when:
 3. Coverage ≥ 85% on the Python layer.
 4. Live IBKR paper-account smoke test passes end-to-end.
 5. README has honest benchmark numbers and renders cleanly on GitHub.
-6. All 4 notebooks run offline without an IBKR account.
+6. All shipped notebooks run offline without an IBKR account.
 
 ---
 
@@ -130,7 +135,7 @@ Phase 1 is "done" when:
 
 **Goal:** Make OptiCore the default glue between data and pricing.
 
-- ⬜ More data providers: Yahoo Finance, Polygon, Deribit (crypto), CBOE DataShop
+- ⬜ More data providers: Polygon, Deribit (crypto), CBOE DataShop (yfinance shipped in Phase 1)
 - ⬜ Historical chain storage (parquet cache)
 - ⬜ Strategy builder API (`Spread`, `Butterfly`, `IronCondor` as first-class objects)
 - ⬜ Position P&L attribution (decompose into delta, gamma, theta, vega contributions)
