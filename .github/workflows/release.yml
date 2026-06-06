@@ -137,7 +137,10 @@ jobs:
   publish_pypi:
     name: Publish to PyPI
     needs: [build_wheels, build_sdist, upload_release]
-    if: startsWith(github.ref, 'refs/tags/v')
+    # Gated on the PYPI_READY repo variable so tag pushes don't fail the run
+    # while the PyPI trusted publisher isn't registered yet. Flip it with:
+    #   gh variable set PYPI_READY --body true
+    if: startsWith(github.ref, 'refs/tags/v') && vars.PYPI_READY == 'true'
     runs-on: ubuntu-latest
     environment:
       name: pypi
