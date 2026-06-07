@@ -29,7 +29,7 @@ jobs:
 
       - name: Upload C++ test logs on failure
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: cpp-test-logs-${{ matrix.os }}
           path: |
@@ -90,7 +90,7 @@ jobs:
 
       - name: Upload Python test results on failure
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: pytest-results-${{ matrix.os }}-py${{ matrix.python-version }}
           path: pytest-results.xml

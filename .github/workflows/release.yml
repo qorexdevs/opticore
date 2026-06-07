@@ -46,7 +46,7 @@ jobs:
         # cibuildwheel reads [tool.cibuildwheel] from pyproject.toml
 
       - name: Upload wheels
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: wheels-${{ matrix.os }}
           path: ./wheelhouse/*.whl
@@ -71,7 +71,7 @@ jobs:
         run: python -m build --sdist
 
       - name: Upload sdist
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: sdist
           path: dist/*.tar.gz
@@ -88,7 +88,7 @@ jobs:
       contents: write   # needed to create/update the Release
     steps:
       - name: Download all artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           path: dist
           merge-multiple: true
@@ -117,7 +117,7 @@ jobs:
       id-token: write   # OIDC trusted publishing — no API token needed
     steps:
       - name: Download all artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           path: dist
           merge-multiple: true
@@ -149,7 +149,7 @@ jobs:
       id-token: write   # OIDC trusted publishing — no API token needed
     steps:
       - name: Download all artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           path: dist
           merge-multiple: true
