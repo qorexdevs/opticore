@@ -57,7 +57,7 @@ This roadmap reflects *intent*, not a promise. Scope for each phase is locked wh
 - ✅ Wheel building via `cibuildwheel`
 - ✅ `.pyi` type stubs + `py.typed` marker
 - ⬜ PyPI release (after wheels work)
-- ⬜ GitHub Pages docs (mkdocs-material or pdoc)
+- ✅ GitHub Pages docs (pdoc API reference, auto-deployed from main)
 
 ### Documentation — 🟡 in progress
 - ✅ `AGENT.md`, `ROADMAP.md`, ADRs

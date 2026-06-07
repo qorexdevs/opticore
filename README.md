@@ -6,6 +6,7 @@
 [![Python](https://img.shields.io/pypi/pyversions/opticore.svg)](https://pypi.org/project/opticore/)
 [![Downloads](https://static.pepy.tech/badge/opticore/month)](https://pepy.tech/project/opticore)
 [![CI](https://github.com/qorexdevs/opticore/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/qorexdevs/opticore/actions/workflows/ci.yml)
+[![Docs](https://img.shields.io/badge/docs-pdoc-blue.svg)](https://qorexdevs.github.io/opticore/)
 [![codecov](https://codecov.io/gh/qorexdevs/opticore/branch/main/graph/badge.svg)](https://codecov.io/gh/qorexdevs/opticore)
 [![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
 [![C++20](https://img.shields.io/badge/C%2B%2B-20-blue.svg)]()
