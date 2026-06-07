@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- `notebooks/05_strategies.ipynb`: spreads, straddle vs expected move, iron
+  condor, position Greeks, covered call. Fully offline on the sample chain.
+
 ## [0.3.0] - 2026-06-07
 
 ### Changed
