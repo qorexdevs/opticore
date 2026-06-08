@@ -173,6 +173,9 @@ def enrich(
     if "mid" not in df.columns and "bid" in df.columns and "ask" in df.columns:
         df["mid"] = (df["bid"] + df["ask"]) / 2.0
 
+    if price_col not in df.columns:
+        raise KeyError(f"Chain has no {price_col!r} column.")
+
     # ── Time to expiry in years ──────────────────────────────────────────
     # Accept either pd.Timestamp (current schema) or legacy "YYYYMMDD" /
     # "YYYY-MM-DD" strings (pandas can parse both via to_datetime).

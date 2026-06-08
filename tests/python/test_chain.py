@@ -199,6 +199,11 @@ class TestEnrich:
         enriched = oc.enrich(chain, rate=0.05, price_col="last")
         assert enriched["iv"].notna().any()
 
+    def test_missing_price_col_raises(self):
+        chain = _make_chain()
+        with pytest.raises(KeyError, match="has no 'nope' column"):
+            oc.enrich(chain, price_col="nope")
+
 
 class TestEnrichPerformance:
     """Lock in vectorized enrich performance (Issue #21)."""

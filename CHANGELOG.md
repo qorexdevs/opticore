@@ -13,6 +13,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - API reference generated with pdoc and published to GitHub Pages on every
   push to main: https://qorexdevs.github.io/opticore/
 
+### Fixed
+- `enrich()` now raises a clear `KeyError` ("Chain has no 'x' column.") when
+  `price_col` names a missing column, matching `parity_check`. Previously it
+  surfaced a bare pandas `KeyError: 'x'`.
+
 ## [0.3.0] - 2026-06-07
 
 ### Changed
