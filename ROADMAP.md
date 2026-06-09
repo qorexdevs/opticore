@@ -47,7 +47,7 @@ This roadmap reflects *intent*, not a promise. Scope for each phase is locked wh
 - ✅ C++ reference-value tests to 1e-12
 - ✅ Python accuracy tests mirroring C++ (133 assertions)
 - ✅ Python chain + plot tests
-- ⬜ Mock IBKR adapter for offline CI ([#1](https://github.com/qorexdevs/opticore/issues/1))
+- ✅ Mock IBKR adapter for offline CI ([#1](https://github.com/qorexdevs/opticore/issues/1))
 - ✅ Hypothesis property-based tests
 - ✅ `pytest-benchmark` suite for perf tracking
 - ✅ Coverage gate ≥ 85% (enforced in CI on the canonical job)

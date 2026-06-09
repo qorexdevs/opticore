@@ -88,7 +88,7 @@ markers = [
 source = ["opticore"]
 branch = true
 omit = [
-    "*/data/ibkr.py",          # requires live IBKR connection to exercise
+    "*/data/ibkr.py",          # exercised offline via a fake ib_async; module-level imports skew the metric
     "*/data/yfinance_adapter.py",  # exercised end-to-end via mocks; module-level imports skew the metric
 ]
 
