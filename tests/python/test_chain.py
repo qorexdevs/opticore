@@ -113,6 +113,12 @@ class TestEnrich:
         expected = np.maximum(puts["strike"] - puts["underlying_price"], 0)
         np.testing.assert_allclose(puts["intrinsic"].values, expected.values)
 
+    def test_extrinsic_is_price_minus_intrinsic(self):
+        chain = _make_chain()
+        enriched = oc.enrich(chain, rate=0.05)
+        expected = enriched["mid"] - enriched["intrinsic"]
+        np.testing.assert_allclose(enriched["extrinsic"].values, expected.values)
+
     def test_iv_recovers_vol(self):
         """IV should approximately recover the vol used to generate prices."""
         chain = _make_chain(n_strikes=5, expiry_days=60)

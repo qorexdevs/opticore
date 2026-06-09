@@ -140,7 +140,9 @@ def enrich(
     """Enrich an option chain DataFrame with IV and Greeks.
 
     Adds columns: ``mid, tte, iv, delta, gamma, theta, vega, rho,
-    moneyness, intrinsic``. When ``include_theo=True`` (default), also
+    moneyness, intrinsic, extrinsic``. ``extrinsic`` is the time value
+    (``price_col`` minus ``intrinsic``), kept raw so sub-intrinsic quotes
+    show up as negative. When ``include_theo=True`` (default), also
     adds ``theo_price`` (BSM price at the recovered IV) and ``mispricing``
     (``price_col`` minus ``theo_price``) — useful for spotting stale quotes.
 
@@ -194,6 +196,11 @@ def enrich(
         np.maximum(df["underlying_price"] - df["strike"], 0),
         np.maximum(df["strike"] - df["underlying_price"], 0),
     )
+
+    # ── Extrinsic (time) value ───────────────────────────────────────────
+    # Kept raw, not clipped at zero: a value below zero means the quote sits
+    # under intrinsic (stale or arb), which is exactly the signal you want.
+    df["extrinsic"] = df[price_col] - df["intrinsic"]
 
     # ── Vectorized IV + Greeks ───────────────────────────────────────────
     # Single trip into C++ for IV solve, then a second for Greeks. NaN
