@@ -119,6 +119,23 @@ class TestEnrich:
         expected = enriched["mid"] - enriched["intrinsic"]
         np.testing.assert_allclose(enriched["extrinsic"].values, expected.values)
 
+    def test_extrinsic_goes_negative_for_sub_intrinsic_quote(self):
+        # a deep ITM call quoted under its intrinsic value: extrinsic must stay
+        # raw and go negative, since that's the stale/arb signal enrich is for
+        chain = pd.DataFrame(
+            [{
+                "symbol": "TEST",
+                "strike": 80.0,
+                "expiry": (datetime.now(timezone.utc) + timedelta(days=30)).strftime("%Y%m%d"),
+                "kind": "call",
+                "mid": 15.0,  # intrinsic is 20.0 at spot 100, so this is under water
+                "underlying_price": 100.0,
+            }]
+        )
+        enriched = oc.enrich(chain, rate=0.05)
+        assert enriched["intrinsic"].iloc[0] == 20.0
+        assert enriched["extrinsic"].iloc[0] == -5.0
+
     def test_iv_recovers_vol(self):
         """IV should approximately recover the vol used to generate prices."""
         chain = _make_chain(n_strikes=5, expiry_days=60)
