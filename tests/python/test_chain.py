@@ -142,9 +142,7 @@ class TestEnrich:
         chain = _make_chain()
         enriched = oc.enrich(chain, rate=0.05)
         # itm is exactly intrinsic > 0, atm rows stay False
-        np.testing.assert_array_equal(
-            enriched["itm"].values, (enriched["intrinsic"] > 0).values
-        )
+        np.testing.assert_array_equal(enriched["itm"].values, (enriched["intrinsic"] > 0).values)
 
     def test_iv_recovers_vol(self):
         """IV should approximately recover the vol used to generate prices."""
