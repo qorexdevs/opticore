@@ -138,6 +138,14 @@ class TestEnrich:
         assert enriched["intrinsic"].iloc[0] == 20.0
         assert enriched["extrinsic"].iloc[0] == -5.0
 
+    def test_itm_flags_in_the_money(self):
+        chain = _make_chain()
+        enriched = oc.enrich(chain, rate=0.05)
+        # itm is exactly intrinsic > 0, atm rows stay False
+        np.testing.assert_array_equal(
+            enriched["itm"].values, (enriched["intrinsic"] > 0).values
+        )
+
     def test_iv_recovers_vol(self):
         """IV should approximately recover the vol used to generate prices."""
         chain = _make_chain(n_strikes=5, expiry_days=60)

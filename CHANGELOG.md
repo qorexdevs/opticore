@@ -8,6 +8,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- `enrich()` now adds an `itm` boolean column (in-the-money flag, `intrinsic > 0`)
+  so you can filter ITM/OTM contracts without recomputing it.
 - `enrich()` now adds an `extrinsic` column (time value, `price_col` minus
   `intrinsic`), kept raw so sub-intrinsic quotes show up as negative.
 - `notebooks/05_strategies.ipynb`: spreads, straddle vs expected move, iron
