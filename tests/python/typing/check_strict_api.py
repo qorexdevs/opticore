@@ -46,6 +46,9 @@ parity = oc.parity_check(chain, rate=0.045, div_yield=0.013)
 # ── implied_forward → DataFrame ─────────────────────────────────────────────
 fwd = oc.implied_forward(chain, rate=0.045)
 
+# ── atm_iv → DataFrame ──────────────────────────────────────────────────────
+atm = oc.atm_iv(chain, rate=0.045)
+
 # ── check_connection → ConnectionStatus TypedDict ───────────────────────────
 status = oc.check_connection()
 connected: bool = status["connected"]

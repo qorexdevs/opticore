@@ -490,3 +490,70 @@ def implied_forward(
         rows,
         columns=["expiry", "tte", "forward", "implied_div_yield", "n_strikes_used"],
     )
+
+
+def atm_iv(
+    chain: pd.DataFrame,
+    rate: float = 0.045,
+    div_yield: float = 0.0,
+    price_col: str = "mid",
+) -> pd.DataFrame:
+    """Recover the ATM implied-vol term structure, one IV per expiry.
+
+    For each expiry the strike nearest spot is taken as ATM, and its implied
+    vol is read from the enriched chain. When both a call and a put sit at that
+    strike, their IVs are averaged — the two should agree under parity, and the
+    mean smooths bid/ask noise. Rows whose IV could not be solved are skipped.
+
+    This is the curve you plot to see term structure (contango vs backwardation)
+    or feed into a vol model as the ATM anchor.
+
+    Parameters
+    ----------
+    chain : pd.DataFrame
+        Same schema as ``enrich`` / ``parity_check``.
+    rate : float
+        Risk-free rate (default: 0.045).
+    div_yield : float
+        Continuous dividend yield (default: 0.0).
+    price_col : str
+        Which price to use (default: 'mid').
+
+    Returns
+    -------
+    pd.DataFrame
+        Columns: expiry, tte, atm_strike, atm_iv, underlying_price.
+        One row per expiry, sorted by expiry.
+
+    Examples
+    --------
+    >>> import opticore as oc
+    >>> oc.atm_iv(chain)  # doctest: +SKIP
+    """
+    cols = ["expiry", "tte", "atm_strike", "atm_iv", "underlying_price"]
+    if chain.empty:
+        return pd.DataFrame(columns=cols)
+
+    enriched = enrich(
+        chain, rate=rate, div_yield=div_yield, price_col=price_col, include_theo=False
+    )
+
+    rows = []
+    for exp, grp in enriched.groupby("expiry", sort=True):
+        valid = grp.dropna(subset=["iv"])
+        if valid.empty:
+            continue
+        spot = float(valid["underlying_price"].iloc[0])
+        dist = (valid["strike"] - spot).abs()
+        nearest = valid.loc[dist == dist.min()]
+        rows.append(
+            {
+                "expiry": exp,
+                "tte": float(nearest["tte"].iloc[0]),
+                "atm_strike": float(nearest["strike"].iloc[0]),
+                "atm_iv": float(nearest["iv"].mean()),
+                "underlying_price": spot,
+            }
+        )
+
+    return pd.DataFrame(rows, columns=cols)

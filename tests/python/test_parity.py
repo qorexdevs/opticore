@@ -186,6 +186,47 @@ class TestImpliedForward:
         assert "forward" in out.columns
 
 
+# ── atm_iv ──────────────────────────────────────────────────────────────────
+
+
+class TestAtmIv:
+    def test_recovers_flat_vol(self):
+        """A chain priced at a flat 0.20 vol should give atm_iv ~ 0.20."""
+        chain = _synthetic_chain(vol=0.20, rate=0.05)
+        out = oc.atm_iv(chain, rate=0.05)
+        assert not out.empty
+        assert (out["atm_iv"] - 0.20).abs().max() < 1e-3
+
+    def test_one_row_per_expiry_sorted(self):
+        chain = _synthetic_chain(expiry_days=(120, 30, 60))
+        out = oc.atm_iv(chain, rate=0.05)
+        assert len(out) == 3
+        assert out["expiry"].is_unique
+        assert out["tte"].is_monotonic_increasing
+
+    def test_atm_strike_is_nearest_spot(self):
+        chain = _synthetic_chain(n_strikes=11)  # strikes 85..115, spot 100
+        out = oc.atm_iv(chain, rate=0.05)
+        assert (out["atm_strike"] == 100.0).all()
+
+    def test_returns_expected_columns(self):
+        chain = _synthetic_chain()
+        out = oc.atm_iv(chain, rate=0.05)
+        assert set(out.columns) == {
+            "expiry",
+            "tte",
+            "atm_strike",
+            "atm_iv",
+            "underlying_price",
+        }
+
+    def test_empty_chain_returns_empty_frame(self):
+        empty = pd.DataFrame(columns=["expiry", "strike", "kind", "underlying_price", "mid"])
+        out = oc.atm_iv(empty)
+        assert out.empty
+        assert "atm_iv" in out.columns
+
+
 # ── Smoke tests for public API surface ──────────────────────────────────────
 
 
@@ -197,3 +238,8 @@ def test_parity_check_in_public_api():
 def test_implied_forward_in_public_api():
     assert hasattr(oc, "implied_forward")
     assert callable(oc.implied_forward)
+
+
+def test_atm_iv_in_public_api():
+    assert hasattr(oc, "atm_iv")
+    assert callable(oc.atm_iv)

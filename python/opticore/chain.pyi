@@ -57,3 +57,9 @@ def implied_forward(
     n_atm_strikes: int = ...,
     price_col: str = ...,
 ) -> pd.DataFrame: ...
+def atm_iv(
+    chain: pd.DataFrame,
+    rate: float = ...,
+    div_yield: float = ...,
+    price_col: str = ...,
+) -> pd.DataFrame: ...
