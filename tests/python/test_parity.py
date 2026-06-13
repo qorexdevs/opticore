@@ -295,12 +295,17 @@ def _skewed_chain(slope_per_lm=-0.5, vol_atm=0.20, underlying=100.0, expiry_days
         for k in strikes:
             vol = vol_atm + slope_per_lm * np.log(k / underlying)
             for kind in ("call", "put"):
-                p = oc.price(spot=underlying, strike=k, expiry=tte, rate=0.05,
-                             vol=vol, kind=kind)
-                rows.append({
-                    "symbol": "TEST", "expiry": exp_ts, "strike": float(k), "kind": kind,
-                    "mid": p, "underlying_price": underlying,
-                })
+                p = oc.price(spot=underlying, strike=k, expiry=tte, rate=0.05, vol=vol, kind=kind)
+                rows.append(
+                    {
+                        "symbol": "TEST",
+                        "expiry": exp_ts,
+                        "strike": float(k),
+                        "kind": kind,
+                        "mid": p,
+                        "underlying_price": underlying,
+                    }
+                )
     return pd.DataFrame(rows)
 
 
