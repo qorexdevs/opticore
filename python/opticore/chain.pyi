@@ -8,7 +8,7 @@ mypy / IDE users see real types instead of `Any`. The stubs in
 
 from __future__ import annotations
 
-from typing import Any, TypedDict
+from typing import Any, NamedTuple, TypedDict
 
 import pandas as pd
 
@@ -58,6 +58,22 @@ def implied_forward(
     price_col: str = ...,
 ) -> pd.DataFrame: ...
 def atm_iv(
+    chain: pd.DataFrame,
+    rate: float = ...,
+    div_yield: float = ...,
+    price_col: str = ...,
+) -> pd.DataFrame: ...
+
+class TermSlope(NamedTuple):
+    slope: float
+    shape: str
+    front_iv: float
+    back_iv: float
+    front_tte: float
+    back_tte: float
+
+def term_slope(atm: pd.DataFrame, flat_tol: float = ...) -> TermSlope: ...
+def iv_skew(
     chain: pd.DataFrame,
     rate: float = ...,
     div_yield: float = ...,

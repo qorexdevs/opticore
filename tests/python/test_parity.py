@@ -276,6 +276,64 @@ class TestTermSlope:
             oc.term_slope(pd.DataFrame({"foo": [1, 2]}))
 
 
+# ── iv_skew ──────────────────────────────────────────────────────────────────
+
+
+def _skewed_chain(slope_per_lm=-0.5, vol_atm=0.20, underlying=100.0, expiry_days=(30,)):
+    """Chain priced with a vol that varies linearly in log-moneyness.
+
+    ``slope_per_lm`` is d(vol)/d(ln(K/S)); negative gives the equity-style
+    negative skew (low strikes carry more vol). iv_skew should recover it.
+    """
+    now = datetime.now(timezone.utc)
+    strikes = np.linspace(85.0, 115.0, 11)
+    rows = []
+    for d in expiry_days:
+        exp_dt = now + timedelta(days=d)
+        exp_ts = pd.Timestamp(exp_dt)
+        tte = (exp_dt - now).total_seconds() / (365.25 * 24 * 3600)
+        for k in strikes:
+            vol = vol_atm + slope_per_lm * np.log(k / underlying)
+            for kind in ("call", "put"):
+                p = oc.price(spot=underlying, strike=k, expiry=tte, rate=0.05,
+                             vol=vol, kind=kind)
+                rows.append({
+                    "symbol": "TEST", "expiry": exp_ts, "strike": float(k), "kind": kind,
+                    "mid": p, "underlying_price": underlying,
+                })
+    return pd.DataFrame(rows)
+
+
+class TestIvSkew:
+    def test_negative_skew_recovered(self):
+        out = oc.iv_skew(_skewed_chain(slope_per_lm=-0.5), rate=0.05)
+        assert len(out) == 1
+        assert out["skew"].iloc[0] < 0
+        # the fit should land near the slope we priced in
+        assert out["skew"].iloc[0] == pytest.approx(-0.5, abs=0.05)
+        assert out["put_wing_iv"].iloc[0] > out["call_wing_iv"].iloc[0]
+
+    def test_flat_smile_is_near_zero(self):
+        out = oc.iv_skew(_skewed_chain(slope_per_lm=0.0), rate=0.05)
+        assert abs(out["skew"].iloc[0]) < 1e-2
+
+    def test_one_row_per_expiry_sorted(self):
+        out = oc.iv_skew(_skewed_chain(expiry_days=(120, 30, 60)), rate=0.05)
+        assert len(out) == 3
+        assert list(out["tte"]) == sorted(out["tte"])
+
+    def test_returns_expected_columns(self):
+        out = oc.iv_skew(_skewed_chain(), rate=0.05)
+        for col in ("expiry", "tte", "atm_iv", "skew", "put_wing_iv", "call_wing_iv", "n_strikes"):
+            assert col in out.columns
+
+    def test_empty_chain_returns_empty_frame(self):
+        empty = pd.DataFrame(columns=["expiry", "strike", "kind", "underlying_price", "mid"])
+        out = oc.iv_skew(empty)
+        assert out.empty
+        assert "skew" in out.columns
+
+
 # ── Smoke tests for public API surface ──────────────────────────────────────
 
 
@@ -297,3 +355,8 @@ def test_atm_iv_in_public_api():
 def test_term_slope_in_public_api():
     assert hasattr(oc, "term_slope")
     assert callable(oc.term_slope)
+
+
+def test_iv_skew_in_public_api():
+    assert hasattr(oc, "iv_skew")
+    assert callable(oc.iv_skew)

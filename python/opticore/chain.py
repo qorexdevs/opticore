@@ -626,3 +626,81 @@ def term_slope(atm: pd.DataFrame, flat_tol: float = 1e-3) -> TermSlope:
         front_tte=float(tte[0]),
         back_tte=float(tte[-1]),
     )
+
+
+def iv_skew(
+    chain: pd.DataFrame,
+    rate: float = 0.045,
+    div_yield: float = 0.0,
+    price_col: str = "mid",
+) -> pd.DataFrame:
+    """Per-expiry volatility skew: slope of IV against log-moneyness.
+
+    Where :func:`atm_iv` / :func:`term_slope` look across expiries, this looks
+    across strikes within each expiry. For every expiry the IVs are regressed on
+    ``ln(K / S)`` and the slope is reported: equities usually print a negative
+    skew (out-of-the-money puts bid up over calls). Call and put IVs at the same
+    strike are averaged first, and rows with an unsolved IV are skipped.
+
+    Parameters
+    ----------
+    chain : pd.DataFrame
+        Same schema as ``enrich`` / ``atm_iv``.
+    rate : float
+        Risk-free rate (default: 0.045).
+    div_yield : float
+        Continuous dividend yield (default: 0.0).
+    price_col : str
+        Which price to use (default: 'mid').
+
+    Returns
+    -------
+    pd.DataFrame
+        Columns: expiry, tte, atm_iv, skew, put_wing_iv, call_wing_iv,
+        n_strikes. ``skew`` is d(IV)/d(ln(K/S)); ``put_wing_iv`` and
+        ``call_wing_iv`` are the IVs at the lowest and highest strike.
+        One row per expiry, sorted by expiry.
+
+    Examples
+    --------
+    >>> import opticore as oc
+    >>> oc.iv_skew(chain)  # doctest: +SKIP
+    """
+    cols = ["expiry", "tte", "atm_iv", "skew", "put_wing_iv", "call_wing_iv", "n_strikes"]
+    if chain.empty:
+        return pd.DataFrame(columns=cols)
+
+    enriched = enrich(
+        chain, rate=rate, div_yield=div_yield, price_col=price_col, include_theo=False
+    )
+
+    rows = []
+    for exp, grp in enriched.groupby("expiry", sort=True):
+        valid = grp.dropna(subset=["iv"])
+        if valid.empty:
+            continue
+        spot = float(valid["underlying_price"].iloc[0])
+        # one IV per strike: average the call and put leg if both are present
+        per_strike = (
+            valid.groupby("strike").agg(iv=("iv", "mean"), tte=("tte", "first")).reset_index()
+        )
+        if len(per_strike) < 2:
+            continue
+        lm = np.log(per_strike["strike"].to_numpy(dtype=float) / spot)
+        ivs = per_strike["iv"].to_numpy(dtype=float)
+        slope = float(np.polyfit(lm, ivs, 1)[0])
+        order = np.argsort(lm)
+        atm_idx = int(np.argmin(np.abs(lm)))
+        rows.append(
+            {
+                "expiry": exp,
+                "tte": float(per_strike["tte"].iloc[0]),
+                "atm_iv": float(ivs[atm_idx]),
+                "skew": slope,
+                "put_wing_iv": float(ivs[order[0]]),
+                "call_wing_iv": float(ivs[order[-1]]),
+                "n_strikes": int(len(per_strike)),
+            }
+        )
+
+    return pd.DataFrame(rows, columns=cols)

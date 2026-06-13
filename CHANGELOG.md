@@ -8,6 +8,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- `iv_skew()`: per-expiry volatility skew, the slope of IV against
+  log-moneyness `ln(K/S)` across strikes within each expiry. Returns expiry,
+  tte, atm_iv, skew, put_wing_iv, call_wing_iv, n_strikes. Negative skew is the
+  usual equity shape (OTM puts bid up over calls).
 - `term_slope()`: fits the `atm_iv()` term structure to a line and labels it
   contango, backwardation, or flat. Returns the slope (IV points per year of
   tenor) plus the front/back IV and tte anchors.

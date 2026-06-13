@@ -147,3 +147,19 @@ def atm_iv(
     div_yield: float = ...,
     price_col: str = ...,
 ) -> pd.DataFrame: ...
+
+class TermSlope(NamedTuple):
+    slope: float
+    shape: str
+    front_iv: float
+    back_iv: float
+    front_tte: float
+    back_tte: float
+
+def term_slope(atm: pd.DataFrame, flat_tol: float = ...) -> TermSlope: ...
+def iv_skew(
+    chain: pd.DataFrame,
+    rate: float = ...,
+    div_yield: float = ...,
+    price_col: str = ...,
+) -> pd.DataFrame: ...
