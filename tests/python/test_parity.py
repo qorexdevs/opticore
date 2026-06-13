@@ -7,6 +7,7 @@ from datetime import datetime, timedelta, timezone
 import numpy as np
 import opticore as oc
 import pandas as pd
+import pytest
 
 
 def _synthetic_chain(
@@ -227,6 +228,54 @@ class TestAtmIv:
         assert "atm_iv" in out.columns
 
 
+# ── term_slope ───────────────────────────────────────────────────────────────
+
+
+def _atm_frame(pairs):
+    """Build a minimal atm_iv-shaped frame from (tte, iv) pairs."""
+    return pd.DataFrame(
+        {
+            "expiry": [f"e{i}" for i in range(len(pairs))],
+            "tte": [t for t, _ in pairs],
+            "atm_strike": [100.0] * len(pairs),
+            "atm_iv": [v for _, v in pairs],
+            "underlying_price": [100.0] * len(pairs),
+        }
+    )
+
+
+class TestTermSlope:
+    def test_flat_vol_chain_is_flat(self):
+        out = oc.term_slope(oc.atm_iv(_synthetic_chain(vol=0.20), rate=0.05))
+        assert out.shape == "flat"
+        assert abs(out.slope) < 1e-3
+
+    def test_rising_curve_is_contango(self):
+        out = oc.term_slope(_atm_frame([(0.1, 0.18), (0.3, 0.22), (0.6, 0.26)]))
+        assert out.shape == "contango"
+        assert out.slope > 0
+        assert out.front_iv == 0.18
+        assert out.back_iv == 0.26
+
+    def test_falling_curve_is_backwardation(self):
+        out = oc.term_slope(_atm_frame([(0.1, 0.30), (0.3, 0.24), (0.6, 0.20)]))
+        assert out.shape == "backwardation"
+        assert out.slope < 0
+
+    def test_unsorted_input_uses_tenor_order(self):
+        out = oc.term_slope(_atm_frame([(0.6, 0.26), (0.1, 0.18)]))
+        assert out.front_tte == 0.1
+        assert out.back_tte == 0.6
+
+    def test_single_expiry_raises(self):
+        with pytest.raises(ValueError):
+            oc.term_slope(_atm_frame([(0.2, 0.2)]))
+
+    def test_missing_columns_raises(self):
+        with pytest.raises(KeyError):
+            oc.term_slope(pd.DataFrame({"foo": [1, 2]}))
+
+
 # ── Smoke tests for public API surface ──────────────────────────────────────
 
 
@@ -243,3 +292,8 @@ def test_implied_forward_in_public_api():
 def test_atm_iv_in_public_api():
     assert hasattr(oc, "atm_iv")
     assert callable(oc.atm_iv)
+
+
+def test_term_slope_in_public_api():
+    assert hasattr(oc, "term_slope")
+    assert callable(oc.term_slope)

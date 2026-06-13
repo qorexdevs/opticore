@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 from datetime import datetime, timezone
+from typing import NamedTuple
 
 import numpy as np
 import pandas as pd
@@ -557,3 +558,71 @@ def atm_iv(
         )
 
     return pd.DataFrame(rows, columns=cols)
+
+
+class TermSlope(NamedTuple):
+    """Least-squares slope of the ATM IV term structure.
+
+    ``slope`` is in IV points per year of tenor: positive means longer-dated
+    options carry more vol (contango), negative means the front is bid up
+    (backwardation).
+    """
+
+    slope: float
+    shape: str  # "contango", "backwardation", or "flat"
+    front_iv: float
+    back_iv: float
+    front_tte: float
+    back_tte: float
+
+
+def term_slope(atm: pd.DataFrame, flat_tol: float = 1e-3) -> TermSlope:
+    """Fit the ATM IV term structure to a line and label its shape.
+
+    Takes the output of :func:`atm_iv` and regresses ``atm_iv`` on ``tte``.
+    The sign of the slope tells you whether the curve is in contango or
+    backwardation; ``flat_tol`` is the dead band around zero treated as flat.
+
+    Parameters
+    ----------
+    atm : pd.DataFrame
+        Output of ``atm_iv`` (needs ``tte`` and ``atm_iv`` columns).
+    flat_tol : float
+        Slopes with magnitude below this are reported as 'flat' (default 1e-3).
+
+    Returns
+    -------
+    TermSlope
+        Named tuple with slope, shape, and the front/back IV and tte anchors.
+
+    Examples
+    --------
+    >>> import opticore as oc
+    >>> oc.term_slope(oc.atm_iv(chain))  # doctest: +SKIP
+    """
+    if "tte" not in atm.columns or "atm_iv" not in atm.columns:
+        raise KeyError("term_slope needs the atm_iv() output (columns 'tte', 'atm_iv')")
+
+    df = atm.dropna(subset=["tte", "atm_iv"]).sort_values("tte")
+    if len(df) < 2:
+        raise ValueError("term_slope needs at least two expiries with a solved IV")
+
+    tte = df["tte"].to_numpy(dtype=float)
+    ivs = df["atm_iv"].to_numpy(dtype=float)
+    slope = float(np.polyfit(tte, ivs, 1)[0])
+
+    if slope > flat_tol:
+        shape = "contango"
+    elif slope < -flat_tol:
+        shape = "backwardation"
+    else:
+        shape = "flat"
+
+    return TermSlope(
+        slope=slope,
+        shape=shape,
+        front_iv=float(ivs[0]),
+        back_iv=float(ivs[-1]),
+        front_tte=float(tte[0]),
+        back_tte=float(tte[-1]),
+    )

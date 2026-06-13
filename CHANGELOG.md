@@ -8,6 +8,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- `term_slope()`: fits the `atm_iv()` term structure to a line and labels it
+  contango, backwardation, or flat. Returns the slope (IV points per year of
+  tenor) plus the front/back IV and tte anchors.
 - `atm_iv()`: ATM implied-vol term structure, one IV per expiry from the strike
   nearest spot (call and put averaged at that strike). Returns expiry, tte,
   atm_strike, atm_iv, underlying_price. Plot it to read contango vs

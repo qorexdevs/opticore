@@ -377,12 +377,14 @@ def greeks_table(
 # Make plot submodule importable
 from opticore import plot  # noqa: F401, E402
 from opticore.chain import (  # noqa: E402
+    TermSlope,
     atm_iv,
     check_connection,
     enrich,
     fetch_chain,
     implied_forward,
     parity_check,
+    term_slope,
 )
 
 __all__ = [
@@ -395,6 +397,8 @@ __all__ = [
     "parity_check",
     "implied_forward",
     "atm_iv",
+    "term_slope",
+    "TermSlope",
     "check_connection",
     "GreeksResult",
     "Leg",
