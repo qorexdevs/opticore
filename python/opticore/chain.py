@@ -704,3 +704,51 @@ def iv_skew(
         )
 
     return pd.DataFrame(rows, columns=cols)
+
+
+def rr_bf(
+    chain: pd.DataFrame,
+    rate: float = 0.045,
+    div_yield: float = 0.0,
+    price_col: str = "mid",
+) -> pd.DataFrame:
+    """Per-expiry risk reversal and butterfly from the smile wings.
+
+    Built on :func:`iv_skew`. ``rr`` (risk reversal) is
+    ``call_wing_iv - put_wing_iv`` — positive when calls are bid over puts,
+    negative for the usual equity put skew. ``bf`` (butterfly) is
+    ``(put_wing_iv + call_wing_iv) / 2 - atm_iv`` — how far the wings sit above
+    the money, i.e. the smile's convexity. Together they're the standard
+    two-number summary of a single expiry's skew.
+
+    Parameters
+    ----------
+    chain : pd.DataFrame
+        Same schema as ``enrich`` / ``iv_skew``.
+    rate : float
+        Risk-free rate (default: 0.045).
+    div_yield : float
+        Continuous dividend yield (default: 0.0).
+    price_col : str
+        Which price to use (default: 'mid').
+
+    Returns
+    -------
+    pd.DataFrame
+        Columns: expiry, tte, atm_iv, rr, bf, n_strikes. One row per expiry,
+        sorted by expiry. Empty if no expiry has at least two solved strikes.
+
+    Examples
+    --------
+    >>> import opticore as oc
+    >>> oc.rr_bf(chain)  # doctest: +SKIP
+    """
+    cols = ["expiry", "tte", "atm_iv", "rr", "bf", "n_strikes"]
+    skew = iv_skew(chain, rate=rate, div_yield=div_yield, price_col=price_col)
+    if skew.empty:
+        return pd.DataFrame(columns=cols)
+
+    out = skew.copy()
+    out["rr"] = out["call_wing_iv"] - out["put_wing_iv"]
+    out["bf"] = (out["put_wing_iv"] + out["call_wing_iv"]) / 2.0 - out["atm_iv"]
+    return out[cols]

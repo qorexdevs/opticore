@@ -339,6 +339,40 @@ class TestIvSkew:
         assert "skew" in out.columns
 
 
+class TestRrBf:
+    def test_negative_skew_gives_negative_rr(self):
+        out = oc.rr_bf(_skewed_chain(slope_per_lm=-0.5), rate=0.05)
+        assert len(out) == 1
+        # equity put skew: puts richer than calls, so call - put wing is negative
+        assert out["rr"].iloc[0] < 0
+
+    def test_flat_smile_rr_near_zero(self):
+        out = oc.rr_bf(_skewed_chain(slope_per_lm=0.0), rate=0.05)
+        assert abs(out["rr"].iloc[0]) < 1e-2
+
+    def test_matches_iv_skew_wings(self):
+        chain = _skewed_chain(slope_per_lm=-0.3)
+        skew = oc.iv_skew(chain, rate=0.05)
+        out = oc.rr_bf(chain, rate=0.05)
+        put_w = skew["put_wing_iv"].iloc[0]
+        call_w = skew["call_wing_iv"].iloc[0]
+        rr = call_w - put_w
+        bf = (put_w + call_w) / 2 - skew["atm_iv"].iloc[0]
+        assert out["rr"].iloc[0] == pytest.approx(rr, abs=1e-6)
+        assert out["bf"].iloc[0] == pytest.approx(bf, abs=1e-6)
+
+    def test_returns_expected_columns(self):
+        out = oc.rr_bf(_skewed_chain(), rate=0.05)
+        for col in ("expiry", "tte", "atm_iv", "rr", "bf", "n_strikes"):
+            assert col in out.columns
+
+    def test_empty_chain_returns_empty_frame(self):
+        empty = pd.DataFrame(columns=["expiry", "strike", "kind", "underlying_price", "mid"])
+        out = oc.rr_bf(empty)
+        assert out.empty
+        assert "rr" in out.columns
+
+
 # ── Smoke tests for public API surface ──────────────────────────────────────
 
 
@@ -365,3 +399,8 @@ def test_term_slope_in_public_api():
 def test_iv_skew_in_public_api():
     assert hasattr(oc, "iv_skew")
     assert callable(oc.iv_skew)
+
+
+def test_rr_bf_in_public_api():
+    assert hasattr(oc, "rr_bf")
+    assert callable(oc.rr_bf)

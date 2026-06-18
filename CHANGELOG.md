@@ -8,6 +8,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- `rr_bf()`: per-expiry risk reversal (`call_wing_iv - put_wing_iv`) and butterfly
+  (`(put_wing_iv + call_wing_iv)/2 - atm_iv`) computed from the `iv_skew()` wings.
+  The standard two-number summary of a single expiry's smile. Returns expiry, tte,
+  atm_iv, rr, bf, n_strikes.
 - `iv_skew()`: per-expiry volatility skew, the slope of IV against
   log-moneyness `ln(K/S)` across strikes within each expiry. Returns expiry,
   tte, atm_iv, skew, put_wing_iv, call_wing_iv, n_strikes. Negative skew is the
