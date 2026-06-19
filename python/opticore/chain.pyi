@@ -89,3 +89,6 @@ def straddle(
     chain: pd.DataFrame,
     price_col: str = ...,
 ) -> pd.DataFrame: ...
+def max_pain(
+    chain: pd.DataFrame,
+) -> pd.DataFrame: ...

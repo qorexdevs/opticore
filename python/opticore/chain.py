@@ -828,3 +828,84 @@ def straddle(
         )
 
     return pd.DataFrame(rows, columns=cols)
+
+
+def max_pain(chain: pd.DataFrame) -> pd.DataFrame:
+    """Per-expiry max-pain strike from open interest.
+
+    Max pain is the settlement price at which the total intrinsic payout owed to
+    option holders is smallest - i.e. where writers, as a group, lose the least.
+    For each candidate price S (every listed strike) the payout is
+    ``sum(call_oi * max(S - K, 0)) + sum(put_oi * max(K - S, 0))`` over all
+    strikes K in that expiry. The strike that minimises it is the max-pain point
+    often quoted as a magnet near expiry.
+
+    Pure open-interest arithmetic, no IV solve, so it works on any chain that
+    carries ``open_interest``. Strikes missing OI are treated as zero; an expiry
+    with no open interest at all is skipped.
+
+    Parameters
+    ----------
+    chain : pd.DataFrame
+        Same schema as ``parity_check`` / ``enrich``; needs ``open_interest``.
+
+    Returns
+    -------
+    pd.DataFrame
+        Columns: expiry, underlying_price, max_pain_strike, total_oi,
+        pain_at_max_pain. One row per expiry, sorted by expiry.
+    """
+    cols = [
+        "expiry",
+        "underlying_price",
+        "max_pain_strike",
+        "total_oi",
+        "pain_at_max_pain",
+    ]
+    if chain.empty or "kind" not in chain.columns or "open_interest" not in chain.columns:
+        return pd.DataFrame(columns=cols)
+
+    df = chain.copy()
+    df["_kind"] = (
+        df["kind"].str.lower().map({"call": "call", "c": "call", "put": "put", "p": "put"})
+    )
+    df = df.dropna(subset=["_kind", "strike", "open_interest"])
+    if df.empty:
+        return pd.DataFrame(columns=cols)
+
+    rows = []
+    for exp, grp in df.groupby("expiry", sort=True):
+        strikes = np.sort(grp["strike"].unique())
+        calls = grp[grp["_kind"] == "call"]
+        puts = grp[grp["_kind"] == "put"]
+        call_oi = calls.groupby("strike")["open_interest"].sum()
+        put_oi = puts.groupby("strike")["open_interest"].sum()
+        total_oi = float(call_oi.sum() + put_oi.sum())
+        if total_oi <= 0:
+            continue
+
+        best_strike = float("nan")
+        best_pain = float("inf")
+        for s in strikes:
+            pain = 0.0
+            for k, oi in call_oi.items():
+                if s > k:
+                    pain += float(oi) * (s - k)
+            for k, oi in put_oi.items():
+                if k > s:
+                    pain += float(oi) * (k - s)
+            if pain < best_pain:
+                best_pain = pain
+                best_strike = float(s)
+
+        rows.append(
+            {
+                "expiry": exp,
+                "underlying_price": float(grp["underlying_price"].iloc[0]),
+                "max_pain_strike": best_strike,
+                "total_oi": total_oi,
+                "pain_at_max_pain": best_pain,
+            }
+        )
+
+    return pd.DataFrame(rows, columns=cols)

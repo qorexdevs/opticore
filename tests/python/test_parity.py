@@ -423,6 +423,69 @@ class TestStraddle:
         assert "straddle_price" in out.columns
 
 
+class TestMaxPain:
+    def test_symmetric_uniform_oi_pins_center(self):
+        # 85..115 strikes, equal OI everywhere, spot 100 -> center strike wins
+        out = oc.max_pain(_synthetic_chain(underlying=100.0, expiry_days=(30,)))
+        assert out["max_pain_strike"].iloc[0] == pytest.approx(100.0)
+
+    def test_heavy_itm_call_oi_pulls_strike_down(self):
+        # call OI piled deep ITM at 90 outweighs a put cluster at 110, so the
+        # writers' least-pain settlement drops to 90. Hand-checked: pain(90)=2000,
+        # pain(100)=4000, pain(110)=6000.
+        chain = pd.DataFrame(
+            [
+                {
+                    "expiry": "2026-07-01",
+                    "strike": 90.0,
+                    "kind": "call",
+                    "open_interest": 300,
+                    "underlying_price": 100.0,
+                },
+                {
+                    "expiry": "2026-07-01",
+                    "strike": 110.0,
+                    "kind": "put",
+                    "open_interest": 100,
+                    "underlying_price": 100.0,
+                },
+            ]
+        )
+        out = oc.max_pain(chain)
+        r = out.iloc[0]
+        assert r["max_pain_strike"] == pytest.approx(90.0)
+        assert r["total_oi"] == pytest.approx(400.0)
+        assert r["pain_at_max_pain"] == pytest.approx(2000.0)
+
+    def test_one_row_per_expiry_sorted(self):
+        out = oc.max_pain(_synthetic_chain(expiry_days=(120, 30, 60)))
+        assert len(out) == 3
+        assert list(out["expiry"]) == sorted(out["expiry"])
+
+    def test_returns_expected_columns(self):
+        out = oc.max_pain(_synthetic_chain(expiry_days=(30,)))
+        for col in (
+            "expiry",
+            "underlying_price",
+            "max_pain_strike",
+            "total_oi",
+            "pain_at_max_pain",
+        ):
+            assert col in out.columns
+
+    def test_no_open_interest_column_returns_empty(self):
+        chain = _synthetic_chain(expiry_days=(30,)).drop(columns=["open_interest"])
+        out = oc.max_pain(chain)
+        assert out.empty
+        assert "max_pain_strike" in out.columns
+
+    def test_zero_oi_expiry_skipped(self):
+        chain = _synthetic_chain(expiry_days=(30,))
+        chain["open_interest"] = 0
+        out = oc.max_pain(chain)
+        assert out.empty
+
+
 # ── Smoke tests for public API surface ──────────────────────────────────────
 
 
@@ -459,3 +522,8 @@ def test_rr_bf_in_public_api():
 def test_straddle_in_public_api():
     assert hasattr(oc, "straddle")
     assert callable(oc.straddle)
+
+
+def test_max_pain_in_public_api():
+    assert hasattr(oc, "max_pain")
+    assert callable(oc.max_pain)

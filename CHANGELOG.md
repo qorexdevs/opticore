@@ -8,6 +8,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- `max_pain()`: per-expiry max-pain strike from open interest, the settlement
+  price where total intrinsic payout to holders is smallest. Pure OI arithmetic,
+  no IV solve. Returns expiry, underlying_price, max_pain_strike, total_oi,
+  pain_at_max_pain.
+- `straddle()`: per-expiry ATM straddle cost, breakevens and the implied move
+  (straddle over spot), straight from call+put prices with no IV solve. Returns
+  expiry, tte, atm_strike, underlying_price, straddle_price, breakeven_low,
+  breakeven_high, implied_move.
 - `rr_bf()`: per-expiry risk reversal (`call_wing_iv - put_wing_iv`) and butterfly
   (`(put_wing_iv + call_wing_iv)/2 - atm_iv`) computed from the `iv_skew()` wings.
   The standard two-number summary of a single expiry's smile. Returns expiry, tte,
