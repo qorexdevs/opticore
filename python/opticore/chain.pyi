@@ -79,3 +79,13 @@ def iv_skew(
     div_yield: float = ...,
     price_col: str = ...,
 ) -> pd.DataFrame: ...
+def rr_bf(
+    chain: pd.DataFrame,
+    rate: float = ...,
+    div_yield: float = ...,
+    price_col: str = ...,
+) -> pd.DataFrame: ...
+def straddle(
+    chain: pd.DataFrame,
+    price_col: str = ...,
+) -> pd.DataFrame: ...

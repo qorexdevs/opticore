@@ -752,3 +752,79 @@ def rr_bf(
     out["rr"] = out["call_wing_iv"] - out["put_wing_iv"]
     out["bf"] = (out["put_wing_iv"] + out["call_wing_iv"]) / 2.0 - out["atm_iv"]
     return out[cols]
+
+
+def straddle(
+    chain: pd.DataFrame,
+    price_col: str = "mid",
+) -> pd.DataFrame:
+    """Per-expiry ATM straddle cost, breakevens and the implied move.
+
+    For each expiry the strike nearest spot is taken as ATM and its call and put
+    prices are summed: that's what a long straddle costs and what the market is
+    pricing in as the expected move into that expiry. Breakevens sit one straddle
+    width either side of the strike; ``implied_move`` is the straddle as a
+    fraction of spot, the quick "the options imply a +/- X% move" read.
+
+    Unlike :func:`atm_iv` this is pure price arithmetic - no IV solve - so it
+    works even on rows where the IV doesn't converge. Only strikes that quote
+    both a call and a put are used.
+
+    Parameters
+    ----------
+    chain : pd.DataFrame
+        Same schema as ``parity_check`` / ``enrich``.
+    price_col : str
+        Which price to use (default: 'mid').
+
+    Returns
+    -------
+    pd.DataFrame
+        Columns: expiry, tte, atm_strike, underlying_price, straddle_price,
+        breakeven_low, breakeven_high, implied_move. One row per expiry,
+        sorted by expiry.
+
+    Examples
+    --------
+    >>> import opticore as oc
+    >>> oc.straddle(chain)  # doctest: +SKIP
+    """
+    cols = [
+        "expiry",
+        "tte",
+        "atm_strike",
+        "underlying_price",
+        "straddle_price",
+        "breakeven_low",
+        "breakeven_high",
+        "implied_move",
+    ]
+    p = _pivot_call_put(chain, price_col)
+    if p.empty:
+        return pd.DataFrame(columns=cols)
+
+    now = datetime.now(timezone.utc)
+    expiry_dt = pd.to_datetime(p["expiry"], utc=True)
+    p = p.assign(_tte=(expiry_dt - now).dt.total_seconds() / (365.25 * 24 * 3600))
+    p["_dist"] = (p["strike"] - p["underlying_price"]).abs()
+
+    rows = []
+    for exp, grp in p.groupby("expiry", sort=True):
+        atm = grp.loc[grp["_dist"] == grp["_dist"].min()].iloc[0]
+        spot = float(atm["underlying_price"])
+        strike = float(atm["strike"])
+        cost = float(atm["call_mid"] + atm["put_mid"])
+        rows.append(
+            {
+                "expiry": exp,
+                "tte": float(atm["_tte"]),
+                "atm_strike": strike,
+                "underlying_price": spot,
+                "straddle_price": cost,
+                "breakeven_low": strike - cost,
+                "breakeven_high": strike + cost,
+                "implied_move": cost / spot if spot > 0 else float("nan"),
+            }
+        )
+
+    return pd.DataFrame(rows, columns=cols)

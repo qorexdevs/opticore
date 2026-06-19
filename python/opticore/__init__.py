@@ -386,6 +386,7 @@ from opticore.chain import (  # noqa: E402
     iv_skew,
     parity_check,
     rr_bf,
+    straddle,
     term_slope,
 )
 
@@ -403,6 +404,7 @@ __all__ = [
     "TermSlope",
     "iv_skew",
     "rr_bf",
+    "straddle",
     "check_connection",
     "GreeksResult",
     "Leg",

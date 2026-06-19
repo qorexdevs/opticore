@@ -373,6 +373,56 @@ class TestRrBf:
         assert "rr" in out.columns
 
 
+class TestStraddle:
+    def test_atm_strike_is_nearest_spot(self):
+        out = oc.straddle(_synthetic_chain(underlying=100.0))
+        assert (out["atm_strike"] == 100.0).all()
+
+    def test_price_equals_call_plus_put(self):
+        chain = _synthetic_chain(underlying=100.0, expiry_days=(30,))
+        out = oc.straddle(chain)
+        row = chain[(chain["strike"] == 100.0) & (chain["expiry"] == chain["expiry"].iloc[0])]
+        call = float(row[row["kind"] == "call"]["mid"].iloc[0])
+        put = float(row[row["kind"] == "put"]["mid"].iloc[0])
+        assert out["straddle_price"].iloc[0] == pytest.approx(call + put, abs=1e-9)
+
+    def test_breakevens_one_width_either_side(self):
+        out = oc.straddle(_synthetic_chain())
+        r = out.iloc[0]
+        assert r["breakeven_high"] == pytest.approx(r["atm_strike"] + r["straddle_price"])
+        assert r["breakeven_low"] == pytest.approx(r["atm_strike"] - r["straddle_price"])
+
+    def test_implied_move_is_straddle_over_spot(self):
+        out = oc.straddle(_synthetic_chain(underlying=100.0))
+        r = out.iloc[0]
+        assert r["implied_move"] == pytest.approx(r["straddle_price"] / r["underlying_price"])
+
+    def test_one_row_per_expiry_sorted(self):
+        out = oc.straddle(_synthetic_chain(expiry_days=(120, 30, 60)))
+        assert len(out) == 3
+        assert list(out["tte"]) == sorted(out["tte"])
+
+    def test_returns_expected_columns(self):
+        out = oc.straddle(_synthetic_chain())
+        for col in (
+            "expiry",
+            "tte",
+            "atm_strike",
+            "underlying_price",
+            "straddle_price",
+            "breakeven_low",
+            "breakeven_high",
+            "implied_move",
+        ):
+            assert col in out.columns
+
+    def test_empty_chain_returns_empty_frame(self):
+        empty = pd.DataFrame(columns=["expiry", "strike", "kind", "underlying_price", "mid"])
+        out = oc.straddle(empty)
+        assert out.empty
+        assert "straddle_price" in out.columns
+
+
 # ── Smoke tests for public API surface ──────────────────────────────────────
 
 
@@ -404,3 +454,8 @@ def test_iv_skew_in_public_api():
 def test_rr_bf_in_public_api():
     assert hasattr(oc, "rr_bf")
     assert callable(oc.rr_bf)
+
+
+def test_straddle_in_public_api():
+    assert hasattr(oc, "straddle")
+    assert callable(oc.straddle)
