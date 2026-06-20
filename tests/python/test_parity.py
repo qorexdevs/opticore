@@ -556,6 +556,77 @@ class TestPCR:
         assert "oi_pcr" in out.columns
 
 
+class TestOIWalls:
+    def test_picks_highest_oi_strike_each_side(self):
+        chain = pd.DataFrame(
+            [
+                {"expiry": "2026-07-01", "strike": 105.0, "kind": "call",
+                 "open_interest": 800, "underlying_price": 100.0},
+                {"expiry": "2026-07-01", "strike": 110.0, "kind": "call",
+                 "open_interest": 200, "underlying_price": 100.0},
+                {"expiry": "2026-07-01", "strike": 95.0, "kind": "put",
+                 "open_interest": 100, "underlying_price": 100.0},
+                {"expiry": "2026-07-01", "strike": 90.0, "kind": "put",
+                 "open_interest": 600, "underlying_price": 100.0},
+            ]
+        )
+        r = oc.oi_walls(chain).iloc[0]
+        assert r["call_wall"] == pytest.approx(105.0)
+        assert r["call_wall_oi"] == pytest.approx(800.0)
+        assert r["put_wall"] == pytest.approx(90.0)
+        assert r["put_wall_oi"] == pytest.approx(600.0)
+
+    def test_sums_split_rows_at_same_strike(self):
+        chain = pd.DataFrame(
+            [
+                {"expiry": "2026-07-01", "strike": 100.0, "kind": "call",
+                 "open_interest": 300, "underlying_price": 100.0},
+                {"expiry": "2026-07-01", "strike": 100.0, "kind": "call",
+                 "open_interest": 300, "underlying_price": 100.0},
+                {"expiry": "2026-07-01", "strike": 105.0, "kind": "call",
+                 "open_interest": 500, "underlying_price": 100.0},
+            ]
+        )
+        r = oc.oi_walls(chain).iloc[0]
+        assert r["call_wall"] == pytest.approx(100.0)
+        assert r["call_wall_oi"] == pytest.approx(600.0)
+
+    def test_tie_breaks_to_lower_strike(self):
+        chain = pd.DataFrame(
+            [
+                {"expiry": "2026-07-01", "strike": 110.0, "kind": "call",
+                 "open_interest": 400, "underlying_price": 100.0},
+                {"expiry": "2026-07-01", "strike": 105.0, "kind": "call",
+                 "open_interest": 400, "underlying_price": 100.0},
+            ]
+        )
+        r = oc.oi_walls(chain).iloc[0]
+        assert r["call_wall"] == pytest.approx(105.0)
+
+    def test_missing_side_gives_nan_strike(self):
+        chain = pd.DataFrame(
+            [
+                {"expiry": "2026-07-01", "strike": 100.0, "kind": "call",
+                 "open_interest": 250, "underlying_price": 100.0},
+            ]
+        )
+        r = oc.oi_walls(chain).iloc[0]
+        assert r["call_wall"] == pytest.approx(100.0)
+        assert np.isnan(r["put_wall"])
+        assert r["put_wall_oi"] == pytest.approx(0.0)
+
+    def test_one_row_per_expiry_sorted(self):
+        out = oc.oi_walls(_synthetic_chain(expiry_days=(120, 30, 60)))
+        assert len(out) == 3
+        assert list(out["expiry"]) == sorted(out["expiry"])
+
+    def test_no_open_interest_column_returns_empty(self):
+        chain = _synthetic_chain(expiry_days=(30,)).drop(columns=["open_interest"])
+        out = oc.oi_walls(chain)
+        assert out.empty
+        assert "call_wall" in out.columns
+
+
 # ── Smoke tests for public API surface ──────────────────────────────────────
 
 
@@ -602,3 +673,8 @@ def test_max_pain_in_public_api():
 def test_pcr_in_public_api():
     assert hasattr(oc, "pcr")
     assert callable(oc.pcr)
+
+
+def test_oi_walls_in_public_api():
+    assert hasattr(oc, "oi_walls")
+    assert callable(oc.oi_walls)

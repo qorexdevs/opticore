@@ -8,6 +8,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- `oi_walls()`: per-expiry call and put open-interest walls, the strikes carrying
+  the most OI on each side that tend to act as resistance and support. Pure
+  summation, no IV solve; OI is aggregated per strike and ties go to the lower
+  strike. Returns expiry, underlying_price, call_wall, call_wall_oi, put_wall,
+  put_wall_oi.
 - `pcr()`: per-expiry put/call ratio from open interest and volume, a crude
   sentiment gauge. Pure summation, no IV solve; volume is optional. Returns
   expiry, underlying_price, put_oi, call_oi, oi_pcr, put_volume, call_volume,

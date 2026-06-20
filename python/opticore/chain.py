@@ -987,3 +987,75 @@ def pcr(chain: pd.DataFrame) -> pd.DataFrame:
         )
 
     return pd.DataFrame(rows, columns=cols)
+
+
+def oi_walls(chain: pd.DataFrame) -> pd.DataFrame:
+    """Per-expiry call and put open-interest walls.
+
+    The "walls" are the strikes carrying the most open interest on each side: the
+    call wall tends to act as overhead resistance and the put wall as support,
+    since the dealers short those options hedge against price moving through them.
+    Reported per expiry alongside the OI sitting at each wall.
+
+    Pure summation over ``open_interest``, no IV solve. OI is aggregated per
+    strike, so split call/put rows at the same strike are summed. Ties go to the
+    lower strike. A side with no open interest gives a NaN strike and zero OI; an
+    expiry with no OI on either side is skipped.
+
+    Parameters
+    ----------
+    chain : pd.DataFrame
+        Same schema as ``max_pain`` / ``pcr``; needs ``open_interest``.
+
+    Returns
+    -------
+    pd.DataFrame
+        Columns: expiry, underlying_price, call_wall, call_wall_oi, put_wall,
+        put_wall_oi. One row per expiry, sorted by expiry.
+    """
+    cols = [
+        "expiry",
+        "underlying_price",
+        "call_wall",
+        "call_wall_oi",
+        "put_wall",
+        "put_wall_oi",
+    ]
+    if chain.empty or "kind" not in chain.columns or "open_interest" not in chain.columns:
+        return pd.DataFrame(columns=cols)
+
+    df = chain.copy()
+    df["_kind"] = (
+        df["kind"].str.lower().map({"call": "call", "c": "call", "put": "put", "p": "put"})
+    )
+    df = df.dropna(subset=["_kind", "strike", "open_interest"])
+    if df.empty:
+        return pd.DataFrame(columns=cols)
+
+    def _wall(grp):
+        # sum OI per strike, sort by strike so idxmax breaks ties on the lower one
+        by_strike = grp.groupby("strike")["open_interest"].sum().sort_index()
+        by_strike = by_strike[by_strike > 0]
+        if by_strike.empty:
+            return float("nan"), 0.0
+        k = by_strike.idxmax()
+        return float(k), float(by_strike.loc[k])
+
+    rows = []
+    for exp, grp in df.groupby("expiry", sort=True):
+        call_wall, call_wall_oi = _wall(grp[grp["_kind"] == "call"])
+        put_wall, put_wall_oi = _wall(grp[grp["_kind"] == "put"])
+        if call_wall_oi == 0.0 and put_wall_oi == 0.0:
+            continue
+        rows.append(
+            {
+                "expiry": exp,
+                "underlying_price": float(grp["underlying_price"].iloc[0]),
+                "call_wall": call_wall,
+                "call_wall_oi": call_wall_oi,
+                "put_wall": put_wall,
+                "put_wall_oi": put_wall_oi,
+            }
+        )
+
+    return pd.DataFrame(rows, columns=cols)
