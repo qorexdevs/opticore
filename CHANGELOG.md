@@ -8,6 +8,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- `pcr()`: per-expiry put/call ratio from open interest and volume, a crude
+  sentiment gauge. Pure summation, no IV solve; volume is optional. Returns
+  expiry, underlying_price, put_oi, call_oi, oi_pcr, put_volume, call_volume,
+  volume_pcr.
 - `max_pain()`: per-expiry max-pain strike from open interest, the settlement
   price where total intrinsic payout to holders is smallest. Pure OI arithmetic,
   no IV solve. Returns expiry, underlying_price, max_pain_strike, total_oi,

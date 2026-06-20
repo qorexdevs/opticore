@@ -92,3 +92,6 @@ def straddle(
 def max_pain(
     chain: pd.DataFrame,
 ) -> pd.DataFrame: ...
+def pcr(
+    chain: pd.DataFrame,
+) -> pd.DataFrame: ...

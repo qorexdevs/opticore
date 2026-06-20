@@ -486,6 +486,76 @@ class TestMaxPain:
         assert out.empty
 
 
+class TestPCR:
+    def test_uniform_chain_is_one(self):
+        # synthetic chain has equal call/put OI and volume everywhere
+        out = oc.pcr(_synthetic_chain(expiry_days=(30,)))
+        r = out.iloc[0]
+        assert r["oi_pcr"] == pytest.approx(1.0)
+        assert r["volume_pcr"] == pytest.approx(1.0)
+
+    def test_more_puts_than_calls(self):
+        chain = pd.DataFrame(
+            [
+                {
+                    "expiry": "2026-07-01",
+                    "strike": 100.0,
+                    "kind": "call",
+                    "open_interest": 100,
+                    "volume": 10,
+                    "underlying_price": 100.0,
+                },
+                {
+                    "expiry": "2026-07-01",
+                    "strike": 100.0,
+                    "kind": "put",
+                    "open_interest": 300,
+                    "volume": 40,
+                    "underlying_price": 100.0,
+                },
+            ]
+        )
+        r = oc.pcr(chain).iloc[0]
+        assert r["put_oi"] == pytest.approx(300.0)
+        assert r["call_oi"] == pytest.approx(100.0)
+        assert r["oi_pcr"] == pytest.approx(3.0)
+        assert r["volume_pcr"] == pytest.approx(4.0)
+
+    def test_zero_call_oi_gives_nan_ratio(self):
+        chain = pd.DataFrame(
+            [
+                {
+                    "expiry": "2026-07-01",
+                    "strike": 100.0,
+                    "kind": "put",
+                    "open_interest": 200,
+                    "volume": 5,
+                    "underlying_price": 100.0,
+                },
+            ]
+        )
+        r = oc.pcr(chain).iloc[0]
+        assert r["put_oi"] == pytest.approx(200.0)
+        assert np.isnan(r["oi_pcr"])
+
+    def test_missing_volume_column_keeps_oi_ratio(self):
+        chain = _synthetic_chain(expiry_days=(30,)).drop(columns=["volume"])
+        r = oc.pcr(chain).iloc[0]
+        assert r["oi_pcr"] == pytest.approx(1.0)
+        assert np.isnan(r["volume_pcr"])
+
+    def test_one_row_per_expiry_sorted(self):
+        out = oc.pcr(_synthetic_chain(expiry_days=(120, 30, 60)))
+        assert len(out) == 3
+        assert list(out["expiry"]) == sorted(out["expiry"])
+
+    def test_no_open_interest_column_returns_empty(self):
+        chain = _synthetic_chain(expiry_days=(30,)).drop(columns=["open_interest"])
+        out = oc.pcr(chain)
+        assert out.empty
+        assert "oi_pcr" in out.columns
+
+
 # ── Smoke tests for public API surface ──────────────────────────────────────
 
 
@@ -527,3 +597,8 @@ def test_straddle_in_public_api():
 def test_max_pain_in_public_api():
     assert hasattr(oc, "max_pain")
     assert callable(oc.max_pain)
+
+
+def test_pcr_in_public_api():
+    assert hasattr(oc, "pcr")
+    assert callable(oc.pcr)

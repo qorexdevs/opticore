@@ -909,3 +909,81 @@ def max_pain(chain: pd.DataFrame) -> pd.DataFrame:
         )
 
     return pd.DataFrame(rows, columns=cols)
+
+
+def pcr(chain: pd.DataFrame) -> pd.DataFrame:
+    """Per-expiry put/call ratio from open interest and volume.
+
+    The put/call ratio is a crude sentiment gauge: more puts than calls (ratio
+    above 1) reads as defensive or bearish positioning, below 1 as bullish. Both
+    the open-interest and the volume cut are reported - OI is the standing book,
+    volume is the day's flow, and they often disagree.
+
+    Pure summation, no IV solve. ``open_interest`` is required; ``volume`` is
+    optional and its ratio is NaN when the column is missing or an expiry has no
+    call volume. A ratio is NaN when the call side is zero (division by zero) but
+    the row is still emitted so the put total stays visible.
+
+    Parameters
+    ----------
+    chain : pd.DataFrame
+        Same schema as ``max_pain`` / ``enrich``; needs ``open_interest``.
+
+    Returns
+    -------
+    pd.DataFrame
+        Columns: expiry, underlying_price, put_oi, call_oi, oi_pcr,
+        put_volume, call_volume, volume_pcr. One row per expiry, sorted by expiry.
+    """
+    cols = [
+        "expiry",
+        "underlying_price",
+        "put_oi",
+        "call_oi",
+        "oi_pcr",
+        "put_volume",
+        "call_volume",
+        "volume_pcr",
+    ]
+    if chain.empty or "kind" not in chain.columns or "open_interest" not in chain.columns:
+        return pd.DataFrame(columns=cols)
+
+    df = chain.copy()
+    df["_kind"] = (
+        df["kind"].str.lower().map({"call": "call", "c": "call", "put": "put", "p": "put"})
+    )
+    df = df.dropna(subset=["_kind", "open_interest"])
+    if df.empty:
+        return pd.DataFrame(columns=cols)
+
+    has_volume = "volume" in df.columns
+
+    rows = []
+    for exp, grp in df.groupby("expiry", sort=True):
+        calls = grp[grp["_kind"] == "call"]
+        puts = grp[grp["_kind"] == "put"]
+        call_oi = float(calls["open_interest"].sum())
+        put_oi = float(puts["open_interest"].sum())
+        oi_pcr = put_oi / call_oi if call_oi > 0 else float("nan")
+
+        if has_volume:
+            call_vol = float(calls["volume"].sum(skipna=True))
+            put_vol = float(puts["volume"].sum(skipna=True))
+            volume_pcr = put_vol / call_vol if call_vol > 0 else float("nan")
+        else:
+            call_vol = put_vol = volume_pcr = float("nan")
+
+        rows.append(
+            {
+                "expiry": exp,
+                "underlying_price": float(grp["underlying_price"].iloc[0]),
+                "put_oi": put_oi,
+                "call_oi": call_oi,
+                "oi_pcr": oi_pcr,
+                "put_volume": put_vol,
+                "call_volume": call_vol,
+                "volume_pcr": volume_pcr,
+            }
+        )
+
+    return pd.DataFrame(rows, columns=cols)
