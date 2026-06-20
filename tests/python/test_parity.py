@@ -560,14 +560,34 @@ class TestOIWalls:
     def test_picks_highest_oi_strike_each_side(self):
         chain = pd.DataFrame(
             [
-                {"expiry": "2026-07-01", "strike": 105.0, "kind": "call",
-                 "open_interest": 800, "underlying_price": 100.0},
-                {"expiry": "2026-07-01", "strike": 110.0, "kind": "call",
-                 "open_interest": 200, "underlying_price": 100.0},
-                {"expiry": "2026-07-01", "strike": 95.0, "kind": "put",
-                 "open_interest": 100, "underlying_price": 100.0},
-                {"expiry": "2026-07-01", "strike": 90.0, "kind": "put",
-                 "open_interest": 600, "underlying_price": 100.0},
+                {
+                    "expiry": "2026-07-01",
+                    "strike": 105.0,
+                    "kind": "call",
+                    "open_interest": 800,
+                    "underlying_price": 100.0,
+                },
+                {
+                    "expiry": "2026-07-01",
+                    "strike": 110.0,
+                    "kind": "call",
+                    "open_interest": 200,
+                    "underlying_price": 100.0,
+                },
+                {
+                    "expiry": "2026-07-01",
+                    "strike": 95.0,
+                    "kind": "put",
+                    "open_interest": 100,
+                    "underlying_price": 100.0,
+                },
+                {
+                    "expiry": "2026-07-01",
+                    "strike": 90.0,
+                    "kind": "put",
+                    "open_interest": 600,
+                    "underlying_price": 100.0,
+                },
             ]
         )
         r = oc.oi_walls(chain).iloc[0]
@@ -579,12 +599,27 @@ class TestOIWalls:
     def test_sums_split_rows_at_same_strike(self):
         chain = pd.DataFrame(
             [
-                {"expiry": "2026-07-01", "strike": 100.0, "kind": "call",
-                 "open_interest": 300, "underlying_price": 100.0},
-                {"expiry": "2026-07-01", "strike": 100.0, "kind": "call",
-                 "open_interest": 300, "underlying_price": 100.0},
-                {"expiry": "2026-07-01", "strike": 105.0, "kind": "call",
-                 "open_interest": 500, "underlying_price": 100.0},
+                {
+                    "expiry": "2026-07-01",
+                    "strike": 100.0,
+                    "kind": "call",
+                    "open_interest": 300,
+                    "underlying_price": 100.0,
+                },
+                {
+                    "expiry": "2026-07-01",
+                    "strike": 100.0,
+                    "kind": "call",
+                    "open_interest": 300,
+                    "underlying_price": 100.0,
+                },
+                {
+                    "expiry": "2026-07-01",
+                    "strike": 105.0,
+                    "kind": "call",
+                    "open_interest": 500,
+                    "underlying_price": 100.0,
+                },
             ]
         )
         r = oc.oi_walls(chain).iloc[0]
@@ -594,10 +629,20 @@ class TestOIWalls:
     def test_tie_breaks_to_lower_strike(self):
         chain = pd.DataFrame(
             [
-                {"expiry": "2026-07-01", "strike": 110.0, "kind": "call",
-                 "open_interest": 400, "underlying_price": 100.0},
-                {"expiry": "2026-07-01", "strike": 105.0, "kind": "call",
-                 "open_interest": 400, "underlying_price": 100.0},
+                {
+                    "expiry": "2026-07-01",
+                    "strike": 110.0,
+                    "kind": "call",
+                    "open_interest": 400,
+                    "underlying_price": 100.0,
+                },
+                {
+                    "expiry": "2026-07-01",
+                    "strike": 105.0,
+                    "kind": "call",
+                    "open_interest": 400,
+                    "underlying_price": 100.0,
+                },
             ]
         )
         r = oc.oi_walls(chain).iloc[0]
@@ -606,8 +651,13 @@ class TestOIWalls:
     def test_missing_side_gives_nan_strike(self):
         chain = pd.DataFrame(
             [
-                {"expiry": "2026-07-01", "strike": 100.0, "kind": "call",
-                 "open_interest": 250, "underlying_price": 100.0},
+                {
+                    "expiry": "2026-07-01",
+                    "strike": 100.0,
+                    "kind": "call",
+                    "open_interest": 250,
+                    "underlying_price": 100.0,
+                },
             ]
         )
         r = oc.oi_walls(chain).iloc[0]
