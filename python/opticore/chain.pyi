@@ -95,3 +95,6 @@ def max_pain(
 def pcr(
     chain: pd.DataFrame,
 ) -> pd.DataFrame: ...
+def oi_walls(
+    chain: pd.DataFrame,
+) -> pd.DataFrame: ...
