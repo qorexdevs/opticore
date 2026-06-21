@@ -1128,3 +1128,73 @@ def oi_profile(chain: pd.DataFrame) -> pd.DataFrame:
             )
 
     return pd.DataFrame(rows, columns=cols)
+
+
+def volume_profile(chain: pd.DataFrame) -> pd.DataFrame:
+    """Per-strike call/put traded-volume profile, one row per expiry and strike.
+
+    The day's-flow companion to ``oi_profile``: where ``oi_profile`` shows the
+    standing book, this shows what actually changed hands today. Same per-strike
+    layout - call and put volume side by side at every strike, plus the total and
+    the net (call minus put) - so a spike here that isn't in the OI profile flags
+    fresh positioning before it settles into open interest.
+
+    Pure summation over ``volume``, no IV solve. Volume is aggregated per strike,
+    so split rows at the same strike are summed; a side with no contracts at a
+    strike contributes zero. Strikes with no volume on either side are dropped.
+
+    Parameters
+    ----------
+    chain : pd.DataFrame
+        Same schema as ``oi_profile`` / ``max_pain``; needs ``volume``.
+
+    Returns
+    -------
+    pd.DataFrame
+        Columns: expiry, underlying_price, strike, call_volume, put_volume,
+        total_volume, net_volume. One row per (expiry, strike), sorted by expiry
+        then strike.
+    """
+    cols = [
+        "expiry",
+        "underlying_price",
+        "strike",
+        "call_volume",
+        "put_volume",
+        "total_volume",
+        "net_volume",
+    ]
+    if chain.empty or "kind" not in chain.columns or "volume" not in chain.columns:
+        return pd.DataFrame(columns=cols)
+
+    df = chain.copy()
+    df["_kind"] = (
+        df["kind"].str.lower().map({"call": "call", "c": "call", "put": "put", "p": "put"})
+    )
+    df = df.dropna(subset=["_kind", "strike", "volume"])
+    if df.empty:
+        return pd.DataFrame(columns=cols)
+
+    rows = []
+    for exp, grp in df.groupby("expiry", sort=True):
+        price = float(grp["underlying_price"].iloc[0])
+        call_vol = grp[grp["_kind"] == "call"].groupby("strike")["volume"].sum()
+        put_vol = grp[grp["_kind"] == "put"].groupby("strike")["volume"].sum()
+        for k in sorted(set(call_vol.index) | set(put_vol.index)):
+            c = float(call_vol.get(k, 0.0))
+            p = float(put_vol.get(k, 0.0))
+            if c == 0.0 and p == 0.0:
+                continue
+            rows.append(
+                {
+                    "expiry": exp,
+                    "underlying_price": price,
+                    "strike": float(k),
+                    "call_volume": c,
+                    "put_volume": p,
+                    "total_volume": c + p,
+                    "net_volume": c - p,
+                }
+            )
+
+    return pd.DataFrame(rows, columns=cols)

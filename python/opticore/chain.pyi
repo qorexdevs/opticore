@@ -101,3 +101,6 @@ def oi_walls(
 def oi_profile(
     chain: pd.DataFrame,
 ) -> pd.DataFrame: ...
+def volume_profile(
+    chain: pd.DataFrame,
+) -> pd.DataFrame: ...

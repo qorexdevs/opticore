@@ -8,6 +8,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- `volume_profile()`: per-strike call/put traded-volume profile, one row per
+  expiry and strike, the day's-flow companion to `oi_profile()` - which side and
+  strike actually changed hands today versus the standing book. Pure summation,
+  no IV solve; volume is aggregated per strike and empty strikes dropped. Returns
+  expiry, underlying_price, strike, call_volume, put_volume, total_volume,
+  net_volume.
 - `oi_profile()`: per-strike call/put open-interest profile, one row per expiry
   and strike, the raw distribution `oi_walls()` and `max_pain()` collapse. Pure
   summation, no IV solve; OI is aggregated per strike and empty strikes dropped.

@@ -759,6 +759,78 @@ class TestOIProfile:
         assert "net_oi" in out.columns
 
 
+class TestVolumeProfile:
+    def test_call_put_split_and_net_per_strike(self):
+        chain = pd.DataFrame(
+            [
+                {
+                    "expiry": "2026-07-01",
+                    "strike": 100.0,
+                    "kind": "call",
+                    "volume": 700,
+                    "underlying_price": 100.0,
+                },
+                {
+                    "expiry": "2026-07-01",
+                    "strike": 100.0,
+                    "kind": "put",
+                    "volume": 200,
+                    "underlying_price": 100.0,
+                },
+                {
+                    "expiry": "2026-07-01",
+                    "strike": 95.0,
+                    "kind": "put",
+                    "volume": 400,
+                    "underlying_price": 100.0,
+                },
+            ]
+        )
+        out = oc.volume_profile(chain)
+        assert list(out["strike"]) == [95.0, 100.0]
+        at100 = out[out["strike"] == 100.0].iloc[0]
+        assert at100["call_volume"] == pytest.approx(700.0)
+        assert at100["put_volume"] == pytest.approx(200.0)
+        assert at100["total_volume"] == pytest.approx(900.0)
+        assert at100["net_volume"] == pytest.approx(500.0)
+        at95 = out[out["strike"] == 95.0].iloc[0]
+        assert at95["call_volume"] == pytest.approx(0.0)
+        assert at95["net_volume"] == pytest.approx(-400.0)
+
+    def test_sums_split_rows_at_same_strike(self):
+        chain = pd.DataFrame(
+            [
+                {
+                    "expiry": "2026-07-01",
+                    "strike": 105.0,
+                    "kind": "call",
+                    "volume": 300,
+                    "underlying_price": 100.0,
+                },
+                {
+                    "expiry": "2026-07-01",
+                    "strike": 105.0,
+                    "kind": "call",
+                    "volume": 250,
+                    "underlying_price": 100.0,
+                },
+            ]
+        )
+        r = oc.volume_profile(chain).iloc[0]
+        assert r["call_volume"] == pytest.approx(550.0)
+
+    def test_rows_sorted_by_expiry_then_strike(self):
+        out = oc.volume_profile(_synthetic_chain(expiry_days=(60, 30)))
+        keys = list(zip(out["expiry"], out["strike"]))
+        assert keys == sorted(keys)
+
+    def test_no_volume_column_returns_empty(self):
+        chain = _synthetic_chain(expiry_days=(30,)).drop(columns=["volume"])
+        out = oc.volume_profile(chain)
+        assert out.empty
+        assert "net_volume" in out.columns
+
+
 # ── Smoke tests for public API surface ──────────────────────────────────────
 
 
@@ -815,3 +887,8 @@ def test_oi_walls_in_public_api():
 def test_oi_profile_in_public_api():
     assert hasattr(oc, "oi_profile")
     assert callable(oc.oi_profile)
+
+
+def test_volume_profile_in_public_api():
+    assert hasattr(oc, "volume_profile")
+    assert callable(oc.volume_profile)
