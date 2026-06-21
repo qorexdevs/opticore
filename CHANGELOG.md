@@ -8,6 +8,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- `oi_profile()`: per-strike call/put open-interest profile, one row per expiry
+  and strike, the raw distribution `oi_walls()` and `max_pain()` collapse. Pure
+  summation, no IV solve; OI is aggregated per strike and empty strikes dropped.
+  Returns expiry, underlying_price, strike, call_oi, put_oi, total_oi, net_oi.
 - `oi_walls()`: per-expiry call and put open-interest walls, the strikes carrying
   the most OI on each side that tend to act as resistance and support. Pure
   summation, no IV solve; OI is aggregated per strike and ties go to the lower

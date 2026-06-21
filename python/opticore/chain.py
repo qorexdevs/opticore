@@ -1059,3 +1059,72 @@ def oi_walls(chain: pd.DataFrame) -> pd.DataFrame:
         )
 
     return pd.DataFrame(rows, columns=cols)
+
+
+def oi_profile(chain: pd.DataFrame) -> pd.DataFrame:
+    """Per-strike call/put open-interest profile, one row per expiry and strike.
+
+    This is the raw distribution ``oi_walls`` and ``max_pain`` collapse: the call
+    and put open interest standing at every strike, side by side, plus the total
+    and the net (call minus put) at each. Charted as a histogram it's the open
+    interest profile traders read to spot where positioning clusters, not just the
+    single heaviest strike.
+
+    Pure summation over ``open_interest``, no IV solve. OI is aggregated per
+    strike, so split rows at the same strike are summed; a side with no contracts
+    at a strike contributes zero. Strikes with no OI on either side are dropped.
+
+    Parameters
+    ----------
+    chain : pd.DataFrame
+        Same schema as ``oi_walls`` / ``max_pain``; needs ``open_interest``.
+
+    Returns
+    -------
+    pd.DataFrame
+        Columns: expiry, underlying_price, strike, call_oi, put_oi, total_oi,
+        net_oi. One row per (expiry, strike), sorted by expiry then strike.
+    """
+    cols = [
+        "expiry",
+        "underlying_price",
+        "strike",
+        "call_oi",
+        "put_oi",
+        "total_oi",
+        "net_oi",
+    ]
+    if chain.empty or "kind" not in chain.columns or "open_interest" not in chain.columns:
+        return pd.DataFrame(columns=cols)
+
+    df = chain.copy()
+    df["_kind"] = (
+        df["kind"].str.lower().map({"call": "call", "c": "call", "put": "put", "p": "put"})
+    )
+    df = df.dropna(subset=["_kind", "strike", "open_interest"])
+    if df.empty:
+        return pd.DataFrame(columns=cols)
+
+    rows = []
+    for exp, grp in df.groupby("expiry", sort=True):
+        price = float(grp["underlying_price"].iloc[0])
+        call_oi = grp[grp["_kind"] == "call"].groupby("strike")["open_interest"].sum()
+        put_oi = grp[grp["_kind"] == "put"].groupby("strike")["open_interest"].sum()
+        for k in sorted(set(call_oi.index) | set(put_oi.index)):
+            c = float(call_oi.get(k, 0.0))
+            p = float(put_oi.get(k, 0.0))
+            if c == 0.0 and p == 0.0:
+                continue
+            rows.append(
+                {
+                    "expiry": exp,
+                    "underlying_price": price,
+                    "strike": float(k),
+                    "call_oi": c,
+                    "put_oi": p,
+                    "total_oi": c + p,
+                    "net_oi": c - p,
+                }
+            )
+
+    return pd.DataFrame(rows, columns=cols)

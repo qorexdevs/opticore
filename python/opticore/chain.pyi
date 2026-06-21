@@ -98,3 +98,6 @@ def pcr(
 def oi_walls(
     chain: pd.DataFrame,
 ) -> pd.DataFrame: ...
+def oi_profile(
+    chain: pd.DataFrame,
+) -> pd.DataFrame: ...
