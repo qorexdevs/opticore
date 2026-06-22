@@ -392,6 +392,7 @@ from opticore.chain import (  # noqa: E402
     rr_bf,
     straddle,
     term_slope,
+    turnover,
     volume_profile,
     volume_walls,
 )
@@ -413,6 +414,7 @@ __all__ = [
     "straddle",
     "max_pain",
     "pcr",
+    "turnover",
     "oi_walls",
     "oi_profile",
     "volume_profile",

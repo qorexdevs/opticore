@@ -8,6 +8,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- `turnover()`: per-expiry volume-to-open-interest turnover, call and put side. A
+  ratio near or above 1 means about as many contracts traded today as were already
+  open, flagging fresh positioning over the carry of an existing book. Pure
+  summation, no IV solve; volume optional and NaN when missing, turnover NaN when a
+  side has no open interest. Returns expiry, underlying_price, call_volume, call_oi,
+  call_turnover, put_volume, put_oi, put_turnover.
 - `volume_walls()`: per-expiry call and put traded-volume walls, the strikes that
   traded the most contracts today, the day's-flow companion to `oi_walls()`. A
   volume wall that isn't an OI wall flags where fresh flow is concentrating before

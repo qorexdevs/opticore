@@ -989,6 +989,85 @@ def pcr(chain: pd.DataFrame) -> pd.DataFrame:
     return pd.DataFrame(rows, columns=cols)
 
 
+def turnover(chain: pd.DataFrame) -> pd.DataFrame:
+    """Per-expiry volume-to-open-interest turnover, call and put side.
+
+    Turnover is the day's volume over the standing open interest. A ratio near or
+    above 1 means roughly as many contracts changed hands today as were already
+    open, which flags fresh positioning rather than the carry of an existing book.
+    Reported per side since calls and puts often turn over at very different rates.
+
+    Pure summation, no IV solve. ``open_interest`` is required; ``volume`` is
+    optional and the turnover is NaN when the column is missing. A ratio is NaN
+    when a side has no open interest (division by zero) but the row is still
+    emitted so the volume stays visible.
+
+    Parameters
+    ----------
+    chain : pd.DataFrame
+        Same schema as ``pcr`` / ``max_pain``; needs ``open_interest``.
+
+    Returns
+    -------
+    pd.DataFrame
+        Columns: expiry, underlying_price, call_volume, call_oi, call_turnover,
+        put_volume, put_oi, put_turnover. One row per expiry, sorted by expiry.
+    """
+    cols = [
+        "expiry",
+        "underlying_price",
+        "call_volume",
+        "call_oi",
+        "call_turnover",
+        "put_volume",
+        "put_oi",
+        "put_turnover",
+    ]
+    if chain.empty or "kind" not in chain.columns or "open_interest" not in chain.columns:
+        return pd.DataFrame(columns=cols)
+
+    df = chain.copy()
+    df["_kind"] = (
+        df["kind"].str.lower().map({"call": "call", "c": "call", "put": "put", "p": "put"})
+    )
+    df = df.dropna(subset=["_kind", "open_interest"])
+    if df.empty:
+        return pd.DataFrame(columns=cols)
+
+    has_volume = "volume" in df.columns
+
+    rows = []
+    for exp, grp in df.groupby("expiry", sort=True):
+        calls = grp[grp["_kind"] == "call"]
+        puts = grp[grp["_kind"] == "put"]
+        call_oi = float(calls["open_interest"].sum())
+        put_oi = float(puts["open_interest"].sum())
+
+        if has_volume:
+            call_vol = float(calls["volume"].sum(skipna=True))
+            put_vol = float(puts["volume"].sum(skipna=True))
+        else:
+            call_vol = put_vol = float("nan")
+
+        call_turnover = call_vol / call_oi if call_oi > 0 else float("nan")
+        put_turnover = put_vol / put_oi if put_oi > 0 else float("nan")
+
+        rows.append(
+            {
+                "expiry": exp,
+                "underlying_price": float(grp["underlying_price"].iloc[0]),
+                "call_volume": call_vol,
+                "call_oi": call_oi,
+                "call_turnover": call_turnover,
+                "put_volume": put_vol,
+                "put_oi": put_oi,
+                "put_turnover": put_turnover,
+            }
+        )
+
+    return pd.DataFrame(rows, columns=cols)
+
+
 def oi_walls(chain: pd.DataFrame) -> pd.DataFrame:
     """Per-expiry call and put open-interest walls.
 

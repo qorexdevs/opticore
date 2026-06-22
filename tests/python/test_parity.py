@@ -556,6 +556,67 @@ class TestPCR:
         assert "oi_pcr" in out.columns
 
 
+class TestTurnover:
+    def test_volume_over_oi_each_side(self):
+        chain = pd.DataFrame(
+            [
+                {
+                    "expiry": "2026-07-01",
+                    "strike": 100.0,
+                    "kind": "call",
+                    "open_interest": 200,
+                    "volume": 100,
+                    "underlying_price": 100.0,
+                },
+                {
+                    "expiry": "2026-07-01",
+                    "strike": 100.0,
+                    "kind": "put",
+                    "open_interest": 50,
+                    "volume": 75,
+                    "underlying_price": 100.0,
+                },
+            ]
+        )
+        r = oc.turnover(chain).iloc[0]
+        assert r["call_turnover"] == pytest.approx(0.5)
+        assert r["put_turnover"] == pytest.approx(1.5)
+
+    def test_zero_oi_gives_nan_turnover(self):
+        chain = pd.DataFrame(
+            [
+                {
+                    "expiry": "2026-07-01",
+                    "strike": 100.0,
+                    "kind": "call",
+                    "open_interest": 0,
+                    "volume": 30,
+                    "underlying_price": 100.0,
+                },
+            ]
+        )
+        r = oc.turnover(chain).iloc[0]
+        assert r["call_volume"] == pytest.approx(30.0)
+        assert np.isnan(r["call_turnover"])
+
+    def test_missing_volume_column_gives_nan(self):
+        chain = _synthetic_chain(expiry_days=(30,)).drop(columns=["volume"])
+        r = oc.turnover(chain).iloc[0]
+        assert r["call_oi"] > 0
+        assert np.isnan(r["call_turnover"])
+
+    def test_one_row_per_expiry_sorted(self):
+        out = oc.turnover(_synthetic_chain(expiry_days=(120, 30, 60)))
+        assert len(out) == 3
+        assert list(out["expiry"]) == sorted(out["expiry"])
+
+    def test_no_open_interest_column_returns_empty(self):
+        chain = _synthetic_chain(expiry_days=(30,)).drop(columns=["open_interest"])
+        out = oc.turnover(chain)
+        assert out.empty
+        assert "call_turnover" in out.columns
+
+
 class TestOIWalls:
     def test_picks_highest_oi_strike_each_side(self):
         chain = pd.DataFrame(
@@ -998,6 +1059,11 @@ def test_max_pain_in_public_api():
 def test_pcr_in_public_api():
     assert hasattr(oc, "pcr")
     assert callable(oc.pcr)
+
+
+def test_turnover_in_public_api():
+    assert hasattr(oc, "turnover")
+    assert callable(oc.turnover)
 
 
 def test_oi_walls_in_public_api():
