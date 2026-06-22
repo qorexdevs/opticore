@@ -8,6 +8,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- `volume_walls()`: per-expiry call and put traded-volume walls, the strikes that
+  traded the most contracts today, the day's-flow companion to `oi_walls()`. A
+  volume wall that isn't an OI wall flags where fresh flow is concentrating before
+  it settles into open interest. Pure summation, no IV solve; volume is aggregated
+  per strike and ties go to the lower strike. Returns expiry, underlying_price,
+  call_wall, call_wall_volume, put_wall, put_wall_volume.
 - `volume_profile()`: per-strike call/put traded-volume profile, one row per
   expiry and strike, the day's-flow companion to `oi_profile()` - which side and
   strike actually changed hands today versus the standing book. Pure summation,

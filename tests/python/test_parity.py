@@ -831,6 +831,127 @@ class TestVolumeProfile:
         assert "net_volume" in out.columns
 
 
+class TestVolumeWalls:
+    def test_picks_highest_volume_strike_each_side(self):
+        chain = pd.DataFrame(
+            [
+                {
+                    "expiry": "2026-07-01",
+                    "strike": 105.0,
+                    "kind": "call",
+                    "volume": 800,
+                    "underlying_price": 100.0,
+                },
+                {
+                    "expiry": "2026-07-01",
+                    "strike": 110.0,
+                    "kind": "call",
+                    "volume": 200,
+                    "underlying_price": 100.0,
+                },
+                {
+                    "expiry": "2026-07-01",
+                    "strike": 95.0,
+                    "kind": "put",
+                    "volume": 100,
+                    "underlying_price": 100.0,
+                },
+                {
+                    "expiry": "2026-07-01",
+                    "strike": 90.0,
+                    "kind": "put",
+                    "volume": 600,
+                    "underlying_price": 100.0,
+                },
+            ]
+        )
+        r = oc.volume_walls(chain).iloc[0]
+        assert r["call_wall"] == pytest.approx(105.0)
+        assert r["call_wall_volume"] == pytest.approx(800.0)
+        assert r["put_wall"] == pytest.approx(90.0)
+        assert r["put_wall_volume"] == pytest.approx(600.0)
+
+    def test_sums_split_rows_at_same_strike(self):
+        chain = pd.DataFrame(
+            [
+                {
+                    "expiry": "2026-07-01",
+                    "strike": 100.0,
+                    "kind": "call",
+                    "volume": 300,
+                    "underlying_price": 100.0,
+                },
+                {
+                    "expiry": "2026-07-01",
+                    "strike": 100.0,
+                    "kind": "call",
+                    "volume": 300,
+                    "underlying_price": 100.0,
+                },
+                {
+                    "expiry": "2026-07-01",
+                    "strike": 105.0,
+                    "kind": "call",
+                    "volume": 500,
+                    "underlying_price": 100.0,
+                },
+            ]
+        )
+        r = oc.volume_walls(chain).iloc[0]
+        assert r["call_wall"] == pytest.approx(100.0)
+        assert r["call_wall_volume"] == pytest.approx(600.0)
+
+    def test_tie_breaks_to_lower_strike(self):
+        chain = pd.DataFrame(
+            [
+                {
+                    "expiry": "2026-07-01",
+                    "strike": 110.0,
+                    "kind": "call",
+                    "volume": 400,
+                    "underlying_price": 100.0,
+                },
+                {
+                    "expiry": "2026-07-01",
+                    "strike": 105.0,
+                    "kind": "call",
+                    "volume": 400,
+                    "underlying_price": 100.0,
+                },
+            ]
+        )
+        r = oc.volume_walls(chain).iloc[0]
+        assert r["call_wall"] == pytest.approx(105.0)
+
+    def test_missing_side_gives_nan_strike(self):
+        chain = pd.DataFrame(
+            [
+                {
+                    "expiry": "2026-07-01",
+                    "strike": 100.0,
+                    "kind": "call",
+                    "volume": 250,
+                    "underlying_price": 100.0,
+                },
+            ]
+        )
+        r = oc.volume_walls(chain).iloc[0]
+        assert r["call_wall"] == pytest.approx(100.0)
+        assert np.isnan(r["put_wall"])
+        assert r["put_wall_volume"] == pytest.approx(0.0)
+
+    def test_one_row_per_expiry_sorted(self):
+        out = oc.volume_walls(_synthetic_chain(expiry_days=(120, 30, 60)))
+        assert len(out) == 3
+        assert list(out["expiry"]) == sorted(out["expiry"])
+
+    def test_no_volume_column_returns_empty(self):
+        chain = _synthetic_chain(expiry_days=(30,)).drop(columns=["volume"])
+        out = oc.volume_walls(chain)
+        assert out.empty
+        assert "call_wall" in out.columns
+
+
 # ── Smoke tests for public API surface ──────────────────────────────────────
 
 
@@ -892,3 +1013,8 @@ def test_oi_profile_in_public_api():
 def test_volume_profile_in_public_api():
     assert hasattr(oc, "volume_profile")
     assert callable(oc.volume_profile)
+
+
+def test_volume_walls_in_public_api():
+    assert hasattr(oc, "volume_walls")
+    assert callable(oc.volume_walls)

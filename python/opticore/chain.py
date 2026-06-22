@@ -1198,3 +1198,75 @@ def volume_profile(chain: pd.DataFrame) -> pd.DataFrame:
             )
 
     return pd.DataFrame(rows, columns=cols)
+
+
+def volume_walls(chain: pd.DataFrame) -> pd.DataFrame:
+    """Per-expiry call and put traded-volume walls.
+
+    The day's-flow companion to ``oi_walls``: where ``oi_walls`` finds the strike
+    carrying the most standing open interest on each side, this finds the strike
+    that traded the most contracts today. A volume wall that isn't an OI wall flags
+    where fresh flow is concentrating before it settles into open interest.
+
+    Pure summation over ``volume``, no IV solve. Volume is aggregated per strike,
+    so split call/put rows at the same strike are summed. Ties go to the lower
+    strike. A side with no volume gives a NaN strike and zero volume; an expiry
+    with no volume on either side is skipped.
+
+    Parameters
+    ----------
+    chain : pd.DataFrame
+        Same schema as ``oi_walls`` / ``volume_profile``; needs ``volume``.
+
+    Returns
+    -------
+    pd.DataFrame
+        Columns: expiry, underlying_price, call_wall, call_wall_volume, put_wall,
+        put_wall_volume. One row per expiry, sorted by expiry.
+    """
+    cols = [
+        "expiry",
+        "underlying_price",
+        "call_wall",
+        "call_wall_volume",
+        "put_wall",
+        "put_wall_volume",
+    ]
+    if chain.empty or "kind" not in chain.columns or "volume" not in chain.columns:
+        return pd.DataFrame(columns=cols)
+
+    df = chain.copy()
+    df["_kind"] = (
+        df["kind"].str.lower().map({"call": "call", "c": "call", "put": "put", "p": "put"})
+    )
+    df = df.dropna(subset=["_kind", "strike", "volume"])
+    if df.empty:
+        return pd.DataFrame(columns=cols)
+
+    def _wall(grp):
+        # sum volume per strike, sort by strike so idxmax breaks ties on the lower one
+        by_strike = grp.groupby("strike")["volume"].sum().sort_index()
+        by_strike = by_strike[by_strike > 0]
+        if by_strike.empty:
+            return float("nan"), 0.0
+        k = by_strike.idxmax()
+        return float(k), float(by_strike.loc[k])
+
+    rows = []
+    for exp, grp in df.groupby("expiry", sort=True):
+        call_wall, call_wall_volume = _wall(grp[grp["_kind"] == "call"])
+        put_wall, put_wall_volume = _wall(grp[grp["_kind"] == "put"])
+        if call_wall_volume == 0.0 and put_wall_volume == 0.0:
+            continue
+        rows.append(
+            {
+                "expiry": exp,
+                "underlying_price": float(grp["underlying_price"].iloc[0]),
+                "call_wall": call_wall,
+                "call_wall_volume": call_wall_volume,
+                "put_wall": put_wall,
+                "put_wall_volume": put_wall_volume,
+            }
+        )
+
+    return pd.DataFrame(rows, columns=cols)
