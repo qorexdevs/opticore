@@ -655,10 +655,24 @@ class TestDollarVolume:
         # one expensive put outweighs many cheap calls in dollars but not in count
         chain = pd.DataFrame(
             [
-                {"expiry": "2026-07-01", "strike": 100.0, "kind": "call", "mid": 0.5,
-                 "open_interest": 10, "volume": 1000, "underlying_price": 100.0},
-                {"expiry": "2026-07-01", "strike": 100.0, "kind": "put", "mid": 20.0,
-                 "open_interest": 10, "volume": 100, "underlying_price": 100.0},
+                {
+                    "expiry": "2026-07-01",
+                    "strike": 100.0,
+                    "kind": "call",
+                    "mid": 0.5,
+                    "open_interest": 10,
+                    "volume": 1000,
+                    "underlying_price": 100.0,
+                },
+                {
+                    "expiry": "2026-07-01",
+                    "strike": 100.0,
+                    "kind": "put",
+                    "mid": 20.0,
+                    "open_interest": 10,
+                    "volume": 100,
+                    "underlying_price": 100.0,
+                },
             ]
         )
         count = oc.pcr(chain).iloc[0]
@@ -681,8 +695,15 @@ class TestDollarVolume:
     def test_zero_call_side_gives_nan_pcr(self):
         chain = pd.DataFrame(
             [
-                {"expiry": "2026-07-01", "strike": 100.0, "kind": "put", "mid": 3.0,
-                 "open_interest": 50, "volume": 40, "underlying_price": 100.0},
+                {
+                    "expiry": "2026-07-01",
+                    "strike": 100.0,
+                    "kind": "put",
+                    "mid": 3.0,
+                    "open_interest": 50,
+                    "volume": 40,
+                    "underlying_price": 100.0,
+                },
             ]
         )
         r = oc.dollar_volume(chain).iloc[0]
