@@ -1068,6 +1068,101 @@ def turnover(chain: pd.DataFrame) -> pd.DataFrame:
     return pd.DataFrame(rows, columns=cols)
 
 
+def dollar_volume(
+    chain: pd.DataFrame,
+    price_col: str = "mid",
+    contract_size: float = 100.0,
+) -> pd.DataFrame:
+    """Per-expiry premium in dollars traded and standing, call and put side.
+
+    Where ``pcr`` and ``turnover`` count contracts, this weights each strike by
+    its price: dollar volume is ``price * volume * contract_size`` summed per
+    side, dollar open interest the same for the standing book. A handful of deep
+    in-the-money contracts can carry more premium than a swarm of cheap wings, so
+    the dollar put/call ratio often reads differently than the count one - it
+    shows where the money actually sits, not just the contract tally.
+
+    Pure price arithmetic, no IV solve. ``open_interest`` and the price column are
+    required; ``volume`` is optional and its dollar figure is NaN when missing.
+    Strikes with no quoted price are dropped. A dollar PCR is NaN when the call
+    side is zero, but the row is still emitted so the put total stays visible.
+
+    Parameters
+    ----------
+    chain : pd.DataFrame
+        Same schema as ``pcr`` / ``turnover``; needs ``open_interest`` and
+        ``price_col``.
+    price_col : str
+        Which price to weight by (default: 'mid').
+    contract_size : float
+        Multiplier per contract (default: 100, one equity option).
+
+    Returns
+    -------
+    pd.DataFrame
+        Columns: expiry, underlying_price, call_dollar_volume, put_dollar_volume,
+        dollar_volume_pcr, call_dollar_oi, put_dollar_oi, dollar_oi_pcr. One row
+        per expiry, sorted by expiry.
+    """
+    cols = [
+        "expiry",
+        "underlying_price",
+        "call_dollar_volume",
+        "put_dollar_volume",
+        "dollar_volume_pcr",
+        "call_dollar_oi",
+        "put_dollar_oi",
+        "dollar_oi_pcr",
+    ]
+    if (
+        chain.empty
+        or "kind" not in chain.columns
+        or "open_interest" not in chain.columns
+        or price_col not in chain.columns
+    ):
+        return pd.DataFrame(columns=cols)
+
+    df = chain.copy()
+    df["_kind"] = (
+        df["kind"].str.lower().map({"call": "call", "c": "call", "put": "put", "p": "put"})
+    )
+    df = df.dropna(subset=["_kind", "open_interest", price_col])
+    if df.empty:
+        return pd.DataFrame(columns=cols)
+
+    has_volume = "volume" in df.columns
+
+    rows = []
+    for exp, grp in df.groupby("expiry", sort=True):
+        calls = grp[grp["_kind"] == "call"]
+        puts = grp[grp["_kind"] == "put"]
+        call_doi = float((calls[price_col] * calls["open_interest"]).sum()) * contract_size
+        put_doi = float((puts[price_col] * puts["open_interest"]).sum()) * contract_size
+        doi_pcr = put_doi / call_doi if call_doi > 0 else float("nan")
+
+        if has_volume:
+            call_dvol = float((calls[price_col] * calls["volume"]).sum(skipna=True)) * contract_size
+            put_dvol = float((puts[price_col] * puts["volume"]).sum(skipna=True)) * contract_size
+            dvol_pcr = put_dvol / call_dvol if call_dvol > 0 else float("nan")
+        else:
+            call_dvol = put_dvol = dvol_pcr = float("nan")
+
+        rows.append(
+            {
+                "expiry": exp,
+                "underlying_price": float(grp["underlying_price"].iloc[0]),
+                "call_dollar_volume": call_dvol,
+                "put_dollar_volume": put_dvol,
+                "dollar_volume_pcr": dvol_pcr,
+                "call_dollar_oi": call_doi,
+                "put_dollar_oi": put_doi,
+                "dollar_oi_pcr": doi_pcr,
+            }
+        )
+
+    return pd.DataFrame(rows, columns=cols)
+
+
 def oi_walls(chain: pd.DataFrame) -> pd.DataFrame:
     """Per-expiry call and put open-interest walls.
 

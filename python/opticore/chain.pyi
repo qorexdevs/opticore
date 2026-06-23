@@ -98,6 +98,11 @@ def pcr(
 def turnover(
     chain: pd.DataFrame,
 ) -> pd.DataFrame: ...
+def dollar_volume(
+    chain: pd.DataFrame,
+    price_col: str = ...,
+    contract_size: float = ...,
+) -> pd.DataFrame: ...
 def oi_walls(
     chain: pd.DataFrame,
 ) -> pd.DataFrame: ...

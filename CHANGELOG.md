@@ -8,6 +8,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- `dollar_volume()`: per-expiry premium in dollars traded and standing, call and put
+  side. Where `pcr()` and `turnover()` count contracts, this weights each strike by
+  its price, so a few expensive contracts can outweigh a swarm of cheap wings and the
+  dollar put/call ratio reads where the money actually sits, not just the tally. Pure
+  price arithmetic, no IV solve; `price_col` (default mid) and `contract_size` (default
+  100) configurable, volume optional and NaN when missing. Returns expiry,
+  underlying_price, call/put_dollar_volume, dollar_volume_pcr, call/put_dollar_oi,
+  dollar_oi_pcr.
 - `turnover()`: per-expiry volume-to-open-interest turnover, call and put side. A
   ratio near or above 1 means about as many contracts traded today as were already
   open, flagging fresh positioning over the carry of an existing book. Pure

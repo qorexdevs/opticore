@@ -617,6 +617,90 @@ class TestTurnover:
         assert "call_turnover" in out.columns
 
 
+class TestDollarVolume:
+    def test_premium_weighted_each_side(self):
+        chain = pd.DataFrame(
+            [
+                {
+                    "expiry": "2026-07-01",
+                    "strike": 100.0,
+                    "kind": "call",
+                    "mid": 2.0,
+                    "open_interest": 200,
+                    "volume": 100,
+                    "underlying_price": 100.0,
+                },
+                {
+                    "expiry": "2026-07-01",
+                    "strike": 100.0,
+                    "kind": "put",
+                    "mid": 4.0,
+                    "open_interest": 50,
+                    "volume": 75,
+                    "underlying_price": 100.0,
+                },
+            ]
+        )
+        r = oc.dollar_volume(chain).iloc[0]
+        # call: 2 * 100 * 100 = 20000, put: 4 * 75 * 100 = 30000
+        assert r["call_dollar_volume"] == pytest.approx(20000.0)
+        assert r["put_dollar_volume"] == pytest.approx(30000.0)
+        assert r["dollar_volume_pcr"] == pytest.approx(1.5)
+        # oi: call 2*200*100=40000, put 4*50*100=20000
+        assert r["call_dollar_oi"] == pytest.approx(40000.0)
+        assert r["put_dollar_oi"] == pytest.approx(20000.0)
+        assert r["dollar_oi_pcr"] == pytest.approx(0.5)
+
+    def test_dollar_pcr_differs_from_count_pcr(self):
+        # one expensive put outweighs many cheap calls in dollars but not in count
+        chain = pd.DataFrame(
+            [
+                {"expiry": "2026-07-01", "strike": 100.0, "kind": "call", "mid": 0.5,
+                 "open_interest": 10, "volume": 1000, "underlying_price": 100.0},
+                {"expiry": "2026-07-01", "strike": 100.0, "kind": "put", "mid": 20.0,
+                 "open_interest": 10, "volume": 100, "underlying_price": 100.0},
+            ]
+        )
+        count = oc.pcr(chain).iloc[0]
+        dollars = oc.dollar_volume(chain).iloc[0]
+        assert count["volume_pcr"] == pytest.approx(0.1)
+        assert dollars["dollar_volume_pcr"] == pytest.approx(4.0)
+
+    def test_contract_size_scales(self):
+        chain = _synthetic_chain(expiry_days=(30,))
+        base = oc.dollar_volume(chain).iloc[0]["call_dollar_volume"]
+        scaled = oc.dollar_volume(chain, contract_size=50.0).iloc[0]["call_dollar_volume"]
+        assert scaled == pytest.approx(base / 2.0)
+
+    def test_missing_volume_column_gives_nan(self):
+        chain = _synthetic_chain(expiry_days=(30,)).drop(columns=["volume"])
+        r = oc.dollar_volume(chain).iloc[0]
+        assert r["call_dollar_oi"] > 0
+        assert np.isnan(r["call_dollar_volume"])
+
+    def test_zero_call_side_gives_nan_pcr(self):
+        chain = pd.DataFrame(
+            [
+                {"expiry": "2026-07-01", "strike": 100.0, "kind": "put", "mid": 3.0,
+                 "open_interest": 50, "volume": 40, "underlying_price": 100.0},
+            ]
+        )
+        r = oc.dollar_volume(chain).iloc[0]
+        assert r["put_dollar_volume"] == pytest.approx(12000.0)
+        assert np.isnan(r["dollar_volume_pcr"])
+
+    def test_one_row_per_expiry_sorted(self):
+        out = oc.dollar_volume(_synthetic_chain(expiry_days=(120, 30, 60)))
+        assert len(out) == 3
+        assert list(out["expiry"]) == sorted(out["expiry"])
+
+    def test_missing_price_column_returns_empty(self):
+        chain = _synthetic_chain(expiry_days=(30,)).drop(columns=["mid"])
+        out = oc.dollar_volume(chain)
+        assert out.empty
+        assert "dollar_volume_pcr" in out.columns
+
+
 class TestOIWalls:
     def test_picks_highest_oi_strike_each_side(self):
         chain = pd.DataFrame(
