@@ -48,3 +48,11 @@ def liquidity(
     relative: bool = ...,
     ax: Axes | None = ...,
 ) -> tuple[Figure, Axes]: ...
+def term_structure(
+    chain: pd.DataFrame,
+    rate: float = ...,
+    div_yield: float = ...,
+    price_col: str = ...,
+    fit: bool = ...,
+    ax: Axes | None = ...,
+) -> tuple[Figure, Axes]: ...

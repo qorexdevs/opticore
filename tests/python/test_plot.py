@@ -260,3 +260,56 @@ class TestLiquidity:
     def test_empty_raises(self):
         with pytest.raises(ValueError, match="No liquidity data"):
             oc_plot.liquidity(pd.DataFrame({"strike": [100]}))
+
+
+@pytest.fixture
+def term_chain():
+    """Synthetic chain across three expiries for term-structure tests."""
+    rows = []
+    for exp, vol in [
+        (pd.Timestamp("2026-08-01", tz="UTC"), 0.30),
+        (pd.Timestamp("2026-11-01", tz="UTC"), 0.25),
+        (pd.Timestamp("2027-02-01", tz="UTC"), 0.22),
+    ]:
+        for k in np.arange(90.0, 111.0):
+            p = oc.price(spot=100, strike=float(k), expiry=0.5, rate=0.045, vol=vol, kind="call")
+            rows.append(
+                {
+                    "strike": float(k),
+                    "expiry": exp,
+                    "kind": "call",
+                    "bid": p - 0.05,
+                    "ask": p + 0.05,
+                    "underlying_price": 100.0,
+                }
+            )
+    return pd.DataFrame(rows)
+
+
+class TestTermStructure:
+    """Test oc.plot.term_structure()."""
+
+    def test_returns_fig_ax_tuple(self, term_chain):
+        import matplotlib.axes
+        import matplotlib.figure
+
+        fig, ax = oc_plot.term_structure(term_chain)
+        assert isinstance(fig, matplotlib.figure.Figure)
+        assert isinstance(ax, matplotlib.axes.Axes)
+
+    def test_fit_adds_second_line(self, term_chain):
+        _, ax_fit = oc_plot.term_structure(term_chain, fit=True)
+        _, ax_no = oc_plot.term_structure(term_chain, fit=False)
+        assert len(ax_fit.get_lines()) == len(ax_no.get_lines()) + 1
+
+    def test_custom_ax(self, term_chain):
+        import matplotlib.pyplot as plt
+
+        fig, ax = plt.subplots()
+        out_fig, out_ax = oc_plot.term_structure(term_chain, ax=ax)
+        assert out_fig is fig
+        assert out_ax is ax
+
+    def test_empty_raises(self):
+        with pytest.raises(ValueError, match="No term-structure data"):
+            oc_plot.term_structure(pd.DataFrame())

@@ -8,6 +8,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- `plot.term_structure()`: ATM IV against time to expiry from `atm_iv()`, one point
+  per expiry so contango and backwardation read off the slope. With `fit=True` (default)
+  the `term_slope()` line is overlaid and its shape labelled. Returns `(fig, ax)` like
+  the other plotters.
 - `plot.liquidity()`: bar chart of the per-expiry bid-ask spread from `liquidity()`,
   with a marker for each expiry's widest relative spread so a single untradeable strike
   still shows. `relative=True` (default) plots percent of mid, `relative=False` the

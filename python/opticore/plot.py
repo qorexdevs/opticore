@@ -329,3 +329,75 @@ def liquidity(
 
     fig.tight_layout()
     return fig, ax
+
+
+def term_structure(
+    chain,
+    rate: float = 0.045,
+    div_yield: float = 0.0,
+    price_col: str = "mid",
+    fit: bool = True,
+    ax=None,
+):
+    """Plot the ATM implied-vol term structure from a chain DataFrame.
+
+    One point per expiry, ATM IV against time to expiry, so you can read
+    contango (curve rising with tenor) or backwardation (front bid up) at a
+    glance. With ``fit`` the least-squares line from ``oc.term_slope`` is drawn
+    over the points and its shape is labelled.
+
+    Parameters
+    ----------
+    chain : pd.DataFrame
+        Same schema as ``oc.atm_iv``; needs the columns ``enrich`` reads.
+    rate : float
+        Risk-free rate passed through to ``atm_iv`` (default: 0.045).
+    div_yield : float
+        Continuous dividend yield passed through to ``atm_iv`` (default: 0.0).
+    price_col : str
+        Which price ``atm_iv`` should use (default: 'mid').
+    fit : bool
+        Overlay the fitted term-structure line and shape label when there are
+        at least two expiries. Default True.
+    ax : matplotlib.axes.Axes or None
+        Axes to plot on. If None, creates a new figure.
+
+    Returns
+    -------
+    (fig, ax) : tuple[matplotlib.figure.Figure, matplotlib.axes.Axes]
+        Standard matplotlib convention. Use ``ax`` to add annotations,
+        ``fig`` to save / display.
+    """
+    plt = _get_plt()
+
+    from opticore.chain import atm_iv as compute_atm_iv
+    from opticore.chain import term_slope
+
+    atm = compute_atm_iv(chain, rate=rate, div_yield=div_yield, price_col=price_col)
+    if atm.empty:
+        raise ValueError("No term-structure data to plot after filtering.")
+
+    atm = atm.sort_values("tte")
+    tte = atm["tte"].to_numpy()
+    iv = atm["atm_iv"].to_numpy() * 100
+
+    if ax is None:
+        fig, ax = plt.subplots(1, 1, figsize=(10, 6))
+    else:
+        fig = ax.get_figure()
+
+    ax.plot(tte, iv, "o-", color="tab:blue", markersize=5, label="ATM IV")
+
+    if fit and len(atm) >= 2:
+        ts = term_slope(atm)
+        line = (ts.front_iv + ts.slope * (tte - ts.front_tte)) * 100
+        ax.plot(tte, line, "--", color="tab:red", alpha=0.7, label=f"fit ({ts.shape})")
+
+    ax.set_xlabel("Time to Expiry (years)")
+    ax.set_ylabel("ATM Implied Volatility (%)")
+    ax.set_title("IV Term Structure")
+    ax.legend(fontsize=9)
+    ax.grid(True, alpha=0.3)
+
+    fig.tight_layout()
+    return fig, ax
