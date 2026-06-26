@@ -504,6 +504,88 @@ class TestStrangle:
         assert "strangle_price" in out.columns
 
 
+class TestVertical:
+    def test_legs_bracket_spot(self):
+        # strikes step 3 (85..115), spot 100 -> low leg 100, high leg 103
+        out = oc.vertical(_synthetic_chain(underlying=100.0, expiry_days=(30,)))
+        r = out.iloc[0]
+        assert r["long_strike"] == 100.0
+        assert r["short_strike"] == 103.0
+
+    def test_bull_call_is_debit_with_capped_profit(self):
+        chain = _synthetic_chain(underlying=100.0, expiry_days=(30,))
+        out = oc.vertical(chain, kind="call", side="bull")
+        r = out.iloc[0]
+        assert r["net_debit"] > 0  # pay to open
+        # max profit = strike width - debit, max loss = -debit
+        assert r["max_profit"] == pytest.approx(3.0 - r["net_debit"])
+        assert r["max_loss"] == pytest.approx(-r["net_debit"])
+        assert r["breakeven"] == pytest.approx(100.0 + r["net_debit"])
+
+    def test_bear_call_is_credit_mirror_of_bull(self):
+        chain = _synthetic_chain(underlying=100.0, expiry_days=(30,))
+        bull = oc.vertical(chain, kind="call", side="bull").iloc[0]
+        bear = oc.vertical(chain, kind="call", side="bear").iloc[0]
+        # same two strikes, opposite sign cost and flipped profit/loss
+        assert bear["net_debit"] == pytest.approx(-bull["net_debit"])
+        assert bear["max_profit"] == pytest.approx(-bull["max_loss"])
+        assert bear["max_loss"] == pytest.approx(-bull["max_profit"])
+        assert bear["breakeven"] == pytest.approx(bull["breakeven"])
+
+    def test_bull_put_is_credit(self):
+        chain = _synthetic_chain(underlying=100.0, expiry_days=(30,))
+        out = oc.vertical(chain, kind="put", side="bull")
+        r = out.iloc[0]
+        assert r["net_debit"] < 0  # collect premium
+        assert r["max_profit"] == pytest.approx(-r["net_debit"])
+        assert r["max_loss"] == pytest.approx(-(3.0 + r["net_debit"]))
+
+    def test_width_widens_the_spread(self):
+        chain = _synthetic_chain(underlying=100.0, expiry_days=(30,))
+        w1 = oc.vertical(chain, width=1).iloc[0]
+        w2 = oc.vertical(chain, width=2).iloc[0]
+        assert w2["short_strike"] - w2["long_strike"] == pytest.approx(6.0)
+        # wider debit spread costs more but can earn more
+        assert w2["net_debit"] > w1["net_debit"]
+        assert w2["max_profit"] > w1["max_profit"]
+
+    def test_one_row_per_expiry_sorted(self):
+        out = oc.vertical(_synthetic_chain(expiry_days=(120, 30, 60)))
+        assert len(out) == 3
+        assert list(out["tte"]) == sorted(out["tte"])
+
+    def test_returns_expected_columns(self):
+        out = oc.vertical(_synthetic_chain())
+        for col in (
+            "expiry",
+            "tte",
+            "kind",
+            "side",
+            "long_strike",
+            "short_strike",
+            "underlying_price",
+            "net_debit",
+            "max_profit",
+            "max_loss",
+            "breakeven",
+        ):
+            assert col in out.columns
+
+    def test_bad_args_raise(self):
+        with pytest.raises(ValueError):
+            oc.vertical(_synthetic_chain(), width=0)
+        with pytest.raises(ValueError):
+            oc.vertical(_synthetic_chain(), kind="straddle")
+        with pytest.raises(ValueError):
+            oc.vertical(_synthetic_chain(), side="sideways")
+
+    def test_empty_chain_returns_empty_frame(self):
+        empty = pd.DataFrame(columns=["expiry", "strike", "kind", "underlying_price", "mid"])
+        out = oc.vertical(empty)
+        assert out.empty
+        assert "net_debit" in out.columns
+
+
 class TestMaxPain:
     def test_symmetric_uniform_oi_pins_center(self):
         # 85..115 strikes, equal OI everywhere, spot 100 -> center strike wins

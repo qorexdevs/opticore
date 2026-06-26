@@ -916,6 +916,139 @@ def strangle(
     return pd.DataFrame(rows, columns=cols)
 
 
+def vertical(
+    chain: pd.DataFrame,
+    kind: str = "call",
+    side: str = "bull",
+    width: int = 1,
+    price_col: str = "mid",
+) -> pd.DataFrame:
+    """Per-expiry vertical spread cost, max profit/loss and breakeven.
+
+    A vertical spread buys one option and sells another of the same kind and
+    expiry at a different strike - the defined-risk workhorse the straddle and
+    strangle leave out. Both legs sit around spot: the lower leg is the nearest
+    strike at or below spot and the upper leg the ``width``-th strike above it,
+    so ``width=1`` is the tightest spread and larger values widen it.
+
+    ``side`` picks the direction and ``kind`` the option type, the four standard
+    combinations: a bull call and bear put are debit spreads (you pay to open,
+    ``net_debit > 0``), a bear call and bull put are credit spreads (you collect,
+    ``net_debit < 0``). Max profit, max loss and the breakeven are read straight
+    off the expiry payoff, which is flat outside the strikes and linear between
+    them, so no IV solve is needed. Only strikes quoting both a call and a put
+    are used; an expiry is dropped when no strike sits at/below spot or there is
+    none ``width`` steps above it.
+
+    Parameters
+    ----------
+    chain : pd.DataFrame
+        Same schema as ``straddle`` / ``strangle``.
+    kind : str
+        ``'call'`` or ``'put'`` (default: 'call').
+    side : str
+        ``'bull'`` or ``'bear'`` (default: 'bull').
+    width : int
+        How many strikes apart the legs sit (default: 1). Must be >= 1.
+    price_col : str
+        Which price to use (default: 'mid').
+
+    Returns
+    -------
+    pd.DataFrame
+        Columns: expiry, tte, kind, side, long_strike, short_strike,
+        underlying_price, net_debit, max_profit, max_loss, breakeven. One row
+        per expiry, sorted by expiry. ``net_debit`` is positive for a debit
+        spread, negative for a credit; ``max_loss`` is negative.
+    """
+    if width < 1:
+        raise ValueError("width must be >= 1")
+    kind = kind.lower()
+    side = side.lower()
+    if kind not in ("call", "put"):
+        raise ValueError("kind must be 'call' or 'put'")
+    if side not in ("bull", "bear"):
+        raise ValueError("side must be 'bull' or 'bear'")
+    cols = [
+        "expiry",
+        "tte",
+        "kind",
+        "side",
+        "long_strike",
+        "short_strike",
+        "underlying_price",
+        "net_debit",
+        "max_profit",
+        "max_loss",
+        "breakeven",
+    ]
+    p = _pivot_call_put(chain, price_col)
+    if p.empty:
+        return pd.DataFrame(columns=cols)
+
+    now = datetime.now(timezone.utc)
+    expiry_dt = pd.to_datetime(p["expiry"], utc=True)
+    p = p.assign(_tte=(expiry_dt - now).dt.total_seconds() / (365.25 * 24 * 3600))
+
+    prem_col = "call_mid" if kind == "call" else "put_mid"
+    # bull is long the low strike, bear is long the high strike (both kinds)
+    qty_low = 1.0 if side == "bull" else -1.0
+    qty_high = -qty_low
+
+    rows = []
+    for exp, grp in p.groupby("expiry", sort=True):
+        grp = grp.sort_values("strike").reset_index(drop=True)
+        spot = float(grp["underlying_price"].iloc[0])
+        below = grp[grp["strike"] <= spot]
+        if below.empty:
+            continue
+        lo_idx = int(below.index[-1])
+        hi_idx = lo_idx + width
+        if hi_idx >= len(grp):
+            continue
+        low = grp.iloc[lo_idx]
+        high = grp.iloc[hi_idx]
+        k_low = float(low["strike"])
+        k_high = float(high["strike"])
+        prem_low = float(low[prem_col])
+        prem_high = float(high[prem_col])
+        spread_w = k_high - k_low
+
+        net_cost = qty_low * prem_low + qty_high * prem_high
+        # payoff is flat outside [k_low, k_high]; evaluate the two kinks
+        if kind == "call":
+            pnl_low = -net_cost
+            pnl_high = qty_low * spread_w - net_cost
+        else:
+            pnl_low = qty_high * spread_w - net_cost
+            pnl_high = -net_cost
+
+        max_profit = max(pnl_low, pnl_high)
+        max_loss = min(pnl_low, pnl_high)
+        if pnl_low == pnl_high:
+            breakeven = float("nan")
+        else:
+            breakeven = k_low + (0.0 - pnl_low) * spread_w / (pnl_high - pnl_low)
+
+        rows.append(
+            {
+                "expiry": exp,
+                "tte": float(low["_tte"]),
+                "kind": kind,
+                "side": side,
+                "long_strike": k_low if side == "bull" else k_high,
+                "short_strike": k_high if side == "bull" else k_low,
+                "underlying_price": spot,
+                "net_debit": net_cost,
+                "max_profit": max_profit,
+                "max_loss": max_loss,
+                "breakeven": breakeven,
+            }
+        )
+
+    return pd.DataFrame(rows, columns=cols)
+
+
 def max_pain(chain: pd.DataFrame) -> pd.DataFrame:
     """Per-expiry max-pain strike from open interest.
 

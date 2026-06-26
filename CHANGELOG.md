@@ -8,6 +8,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- `vertical()`: per-expiry vertical spread cost, max profit/loss and breakeven, the
+  defined-risk companion to `straddle()`/`strangle()`. `kind` and `side` pick the four
+  standard combinations (bull/bear call/put); the lower leg is the nearest strike at/below
+  spot and the upper the `width`-th above. `net_debit` is positive for debit spreads,
+  negative for credits; metrics come straight off the expiry payoff, no IV solve.
 - `payoff_profile()`: the numeric companion to `plot.payoff()`. Same intrinsic-value model
   but returns a `PayoffProfile` (sampled `spots`/`pnl`, interpolated `breakevens`, plus
   `max_profit`, `max_loss` and `net_cost`) instead of a figure, so multi-leg strategies can
