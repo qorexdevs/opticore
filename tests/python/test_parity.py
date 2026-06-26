@@ -756,12 +756,33 @@ class TestLiquidity:
     def test_widest_strike_shows_in_max_not_median(self):
         chain = pd.DataFrame(
             [
-                {"expiry": "2026-07-01", "strike": 100.0, "kind": "call",
-                 "bid": 1.98, "ask": 2.02, "mid": 2.0, "underlying_price": 100.0},
-                {"expiry": "2026-07-01", "strike": 105.0, "kind": "call",
-                 "bid": 1.98, "ask": 2.02, "mid": 2.0, "underlying_price": 100.0},
-                {"expiry": "2026-07-01", "strike": 110.0, "kind": "call",
-                 "bid": 0.10, "ask": 0.50, "mid": 0.30, "underlying_price": 100.0},
+                {
+                    "expiry": "2026-07-01",
+                    "strike": 100.0,
+                    "kind": "call",
+                    "bid": 1.98,
+                    "ask": 2.02,
+                    "mid": 2.0,
+                    "underlying_price": 100.0,
+                },
+                {
+                    "expiry": "2026-07-01",
+                    "strike": 105.0,
+                    "kind": "call",
+                    "bid": 1.98,
+                    "ask": 2.02,
+                    "mid": 2.0,
+                    "underlying_price": 100.0,
+                },
+                {
+                    "expiry": "2026-07-01",
+                    "strike": 110.0,
+                    "kind": "call",
+                    "bid": 0.10,
+                    "ask": 0.50,
+                    "mid": 0.30,
+                    "underlying_price": 100.0,
+                },
             ]
         )
         r = oc.liquidity(chain).iloc[0]
@@ -772,8 +793,14 @@ class TestLiquidity:
     def test_falls_back_to_midpoint_when_no_mid_column(self):
         chain = pd.DataFrame(
             [
-                {"expiry": "2026-07-01", "strike": 100.0, "kind": "call",
-                 "bid": 1.0, "ask": 3.0, "underlying_price": 100.0},
+                {
+                    "expiry": "2026-07-01",
+                    "strike": 100.0,
+                    "kind": "call",
+                    "bid": 1.0,
+                    "ask": 3.0,
+                    "underlying_price": 100.0,
+                },
             ]
         )
         r = oc.liquidity(chain).iloc[0]
@@ -783,12 +810,33 @@ class TestLiquidity:
     def test_crossed_and_nonpositive_quotes_dropped(self):
         chain = pd.DataFrame(
             [
-                {"expiry": "2026-07-01", "strike": 100.0, "kind": "call",
-                 "bid": 1.9, "ask": 2.1, "mid": 2.0, "underlying_price": 100.0},
-                {"expiry": "2026-07-01", "strike": 105.0, "kind": "call",
-                 "bid": 2.0, "ask": 1.0, "mid": 1.5, "underlying_price": 100.0},
-                {"expiry": "2026-07-01", "strike": 110.0, "kind": "call",
-                 "bid": 0.0, "ask": 0.0, "mid": 0.0, "underlying_price": 100.0},
+                {
+                    "expiry": "2026-07-01",
+                    "strike": 100.0,
+                    "kind": "call",
+                    "bid": 1.9,
+                    "ask": 2.1,
+                    "mid": 2.0,
+                    "underlying_price": 100.0,
+                },
+                {
+                    "expiry": "2026-07-01",
+                    "strike": 105.0,
+                    "kind": "call",
+                    "bid": 2.0,
+                    "ask": 1.0,
+                    "mid": 1.5,
+                    "underlying_price": 100.0,
+                },
+                {
+                    "expiry": "2026-07-01",
+                    "strike": 110.0,
+                    "kind": "call",
+                    "bid": 0.0,
+                    "ask": 0.0,
+                    "mid": 0.0,
+                    "underlying_price": 100.0,
+                },
             ]
         )
         r = oc.liquidity(chain).iloc[0]
