@@ -856,6 +856,109 @@ class TestLiquidity:
         assert "median_rel_spread" in out.columns
 
 
+class TestLiquidityByStrike:
+    def test_one_row_per_quote_with_spreads(self):
+        chain = pd.DataFrame(
+            [
+                {
+                    "expiry": "2026-07-01",
+                    "strike": 100.0,
+                    "kind": "call",
+                    "bid": 1.90,
+                    "ask": 2.10,
+                    "mid": 2.0,
+                    "underlying_price": 100.0,
+                },
+                {
+                    "expiry": "2026-07-01",
+                    "strike": 105.0,
+                    "kind": "put",
+                    "bid": 0.95,
+                    "ask": 1.05,
+                    "mid": 1.0,
+                    "underlying_price": 100.0,
+                },
+            ]
+        )
+        out = oc.liquidity_by_strike(chain)
+        assert len(out) == 2
+        assert list(out.columns) == [
+            "expiry",
+            "strike",
+            "kind",
+            "bid",
+            "ask",
+            "mid",
+            "spread",
+            "rel_spread",
+        ]
+        first = out.iloc[0]
+        assert first["strike"] == 100.0
+        assert first["spread"] == pytest.approx(0.20)
+        assert first["rel_spread"] == pytest.approx(0.10)
+        second = out.iloc[1]
+        assert second["kind"] == "put"
+        assert second["spread"] == pytest.approx(0.10)
+        assert second["rel_spread"] == pytest.approx(0.10)
+
+    def test_sorted_by_expiry_then_strike(self):
+        out = oc.liquidity_by_strike(
+            _synthetic_chain(expiry_days=(60, 30), n_strikes=5, spread_bps=100.0)
+        )
+        keys = list(zip(out["expiry"], out["strike"]))
+        assert keys == sorted(keys)
+
+    def test_falls_back_to_midpoint_when_no_mid_column(self):
+        chain = pd.DataFrame(
+            [
+                {
+                    "expiry": "2026-07-01",
+                    "strike": 100.0,
+                    "kind": "call",
+                    "bid": 1.0,
+                    "ask": 3.0,
+                    "underlying_price": 100.0,
+                },
+            ]
+        )
+        r = oc.liquidity_by_strike(chain).iloc[0]
+        assert r["mid"] == pytest.approx(2.0)
+        assert r["rel_spread"] == pytest.approx(1.0)
+
+    def test_crossed_and_nonpositive_quotes_dropped(self):
+        chain = pd.DataFrame(
+            [
+                {
+                    "expiry": "2026-07-01",
+                    "strike": 100.0,
+                    "kind": "call",
+                    "bid": 1.9,
+                    "ask": 2.1,
+                    "mid": 2.0,
+                    "underlying_price": 100.0,
+                },
+                {
+                    "expiry": "2026-07-01",
+                    "strike": 105.0,
+                    "kind": "call",
+                    "bid": 2.0,
+                    "ask": 1.0,
+                    "mid": 1.5,
+                    "underlying_price": 100.0,
+                },
+            ]
+        )
+        out = oc.liquidity_by_strike(chain)
+        assert len(out) == 1
+        assert out.iloc[0]["strike"] == 100.0
+
+    def test_missing_columns_returns_empty(self):
+        chain = _synthetic_chain(expiry_days=(30,)).drop(columns=["bid", "ask"])
+        out = oc.liquidity_by_strike(chain)
+        assert out.empty
+        assert "rel_spread" in out.columns
+
+
 class TestOIWalls:
     def test_picks_highest_oi_strike_each_side(self):
         chain = pd.DataFrame(
@@ -1308,6 +1411,11 @@ def test_turnover_in_public_api():
 def test_liquidity_in_public_api():
     assert hasattr(oc, "liquidity")
     assert callable(oc.liquidity)
+
+
+def test_liquidity_by_strike_in_public_api():
+    assert hasattr(oc, "liquidity_by_strike")
+    assert callable(oc.liquidity_by_strike)
 
 
 def test_oi_walls_in_public_api():

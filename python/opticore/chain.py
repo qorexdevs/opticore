@@ -1132,6 +1132,71 @@ def liquidity(chain: pd.DataFrame) -> pd.DataFrame:
     return pd.DataFrame(rows, columns=cols)
 
 
+def liquidity_by_strike(chain: pd.DataFrame) -> pd.DataFrame:
+    """Per-strike bid-ask spread, the contract-level view behind ``liquidity``.
+
+    ``liquidity`` medians the spread per expiry, which ranks expiries but hides
+    the strikes; when you're picking the actual contract to trade you want the
+    spread on each one. This keeps a row per (expiry, strike, kind) with the
+    ``bid``, ``ask``, ``mid``, absolute ``spread`` and relative ``rel_spread``,
+    no aggregation - the raw distribution the median collapses.
+
+    Same arithmetic and drop rules as ``liquidity``: ``mid`` is used when present,
+    otherwise the midpoint of ``bid``/``ask``; quotes with a missing or crossed
+    (``bid > ask``) market or a non-positive mid are dropped.
+
+    Parameters
+    ----------
+    chain : pd.DataFrame
+        Same schema as ``liquidity``; needs ``bid``, ``ask`` and ``kind``.
+
+    Returns
+    -------
+    pd.DataFrame
+        Columns: expiry, strike, kind, bid, ask, mid, spread, rel_spread. One row
+        per quote, sorted by expiry then strike then kind.
+    """
+    cols = ["expiry", "strike", "kind", "bid", "ask", "mid", "spread", "rel_spread"]
+    if (
+        chain.empty
+        or "bid" not in chain.columns
+        or "ask" not in chain.columns
+        or "kind" not in chain.columns
+    ):
+        return pd.DataFrame(columns=cols)
+
+    df = chain.copy()
+    df["_kind"] = (
+        df["kind"].str.lower().map({"call": "call", "c": "call", "put": "put", "p": "put"})
+    )
+    mid = df["mid"] if "mid" in df.columns else (df["bid"] + df["ask"]) / 2.0
+    df["_mid"] = mid
+    df = df.dropna(subset=["_kind", "strike", "bid", "ask", "_mid"])
+    df = df[(df["ask"] >= df["bid"]) & (df["_mid"] > 0)]
+    if df.empty:
+        return pd.DataFrame(columns=cols)
+
+    df["_spread"] = df["ask"] - df["bid"]
+    df["_rel"] = df["_spread"] / df["_mid"]
+    df = df.sort_values(["expiry", "strike", "_kind"], kind="stable")
+
+    rows = [
+        {
+            "expiry": r["expiry"],
+            "strike": float(r["strike"]),
+            "kind": r["_kind"],
+            "bid": float(r["bid"]),
+            "ask": float(r["ask"]),
+            "mid": float(r["_mid"]),
+            "spread": float(r["_spread"]),
+            "rel_spread": float(r["_rel"]),
+        }
+        for _, r in df.iterrows()
+    ]
+
+    return pd.DataFrame(rows, columns=cols)
+
+
 def dollar_volume(
     chain: pd.DataFrame,
     price_col: str = "mid",

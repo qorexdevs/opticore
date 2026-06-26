@@ -8,6 +8,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- `liquidity_by_strike()`: the per-strike view behind `liquidity()`, one row per
+  (expiry, strike, kind) with `bid`, `ask`, `mid`, absolute `spread` and `rel_spread`,
+  no aggregation - the raw distribution the median collapses, for picking the actual
+  contract to trade. Same drop rules as `liquidity()`; sorted by expiry then strike
+  then kind.
 - `liquidity()`: per-expiry bid-ask spread as a tradeability gauge, both absolute
   (`ask - bid`) and relative to mid, reported as the median across the expiry's quotes
   plus the widest relative spread so one untradeable strike can't hide behind a decent

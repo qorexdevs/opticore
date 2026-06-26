@@ -101,6 +101,9 @@ def turnover(
 def liquidity(
     chain: pd.DataFrame,
 ) -> pd.DataFrame: ...
+def liquidity_by_strike(
+    chain: pd.DataFrame,
+) -> pd.DataFrame: ...
 def dollar_volume(
     chain: pd.DataFrame,
     price_col: str = ...,
