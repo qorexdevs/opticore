@@ -369,6 +369,96 @@ def greeks_table(
     )
 
 
+class PayoffProfile(NamedTuple):
+    """Expiry P&L of a multi-leg strategy, sampled over a price grid."""
+
+    spots: np.ndarray
+    pnl: np.ndarray
+    breakevens: list  # interpolated, sorted ascending
+    max_profit: float  # over the sampled grid
+    max_loss: float  # over the sampled grid
+    net_cost: float  # sum of qty * premium; >0 debit, <0 credit
+
+
+def payoff_profile(
+    legs,
+    spot_range: tuple[float, float] | None = None,
+    num_points: int = 200,
+) -> PayoffProfile:
+    """Expiry profit/loss curve and break-evens for a strategy, as data.
+
+    The numeric companion to ``plot.payoff``: same intrinsic-value model but
+    returns the sampled curve and break-even points instead of a figure, so you
+    can screen strategies without matplotlib.
+
+    Parameters
+    ----------
+    legs : sequence of Leg
+        Each ``Leg(kind, strike, qty, premium)``; ``qty>0`` long, ``qty<0`` short.
+    spot_range : tuple or None
+        ``(low, high)`` price grid. Auto-sized around the strikes when None.
+    num_points : int
+        Number of samples across the grid (>= 2).
+
+    Returns
+    -------
+    PayoffProfile
+        spots, pnl, breakevens, max_profit, max_loss and net_cost. ``max_profit``
+        and ``max_loss`` are taken over the sampled grid, so for unbounded
+        strategies (e.g. a lone long call) widen ``spot_range`` to see the tail.
+
+    Examples
+    --------
+    >>> import opticore as oc
+    >>> p = oc.payoff_profile([
+    ...     oc.Leg("call", strike=105, qty=1, premium=3.50),
+    ...     oc.Leg("put",  strike=95,  qty=1, premium=2.10),
+    ... ])
+    >>> [round(b, 2) for b in p.breakevens]
+    [89.4, 110.6]
+    """
+    if not legs:
+        raise ValueError("At least one leg is required.")
+    if num_points < 2:
+        raise ValueError("num_points must be at least 2.")
+
+    strikes = [leg.strike for leg in legs]
+    if spot_range is None:
+        mid = float(np.mean(strikes))
+        span = max(float(np.ptp(strikes)) * 1.5, mid * 0.2)
+        spot_range = (mid - span, mid + span)
+
+    spots = np.linspace(spot_range[0], spot_range[1], num_points)
+
+    total_payoff = np.zeros_like(spots)
+    net_cost = 0.0
+    for leg in legs:
+        if leg.kind.lower() in ("call", "c"):
+            intrinsic = np.maximum(spots - leg.strike, 0.0)
+        else:
+            intrinsic = np.maximum(leg.strike - spots, 0.0)
+        total_payoff += leg.qty * intrinsic
+        net_cost += leg.qty * leg.premium
+
+    pnl = total_payoff - net_cost
+
+    breakevens = []
+    for idx in np.where(np.diff(np.sign(pnl)))[0]:
+        x0, x1 = spots[idx], spots[idx + 1]
+        y0, y1 = pnl[idx], pnl[idx + 1]
+        be = x0 - y0 * (x1 - x0) / (y1 - y0) if y1 != y0 else x0
+        breakevens.append(float(be))
+
+    return PayoffProfile(
+        spots=spots,
+        pnl=pnl,
+        breakevens=sorted(breakevens),
+        max_profit=float(pnl.max()),
+        max_loss=float(pnl.min()),
+        net_cost=float(net_cost),
+    )
+
+
 # ════════════════════════════════════════════════════════════════════════════
 # Re-exports
 # ════════════════════════════════════════════════════════════════════════════
@@ -406,6 +496,7 @@ __all__ = [
     "iv",
     "greeks",
     "greeks_table",
+    "payoff_profile",
     "fetch_chain",
     "enrich",
     "parity_check",
@@ -430,6 +521,7 @@ __all__ = [
     "check_connection",
     "GreeksResult",
     "Leg",
+    "PayoffProfile",
     "plot",
     "__version__",
 ]

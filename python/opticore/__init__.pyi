@@ -12,7 +12,7 @@ stub (rather than relying on inline hints alone) for two reasons:
 
 from __future__ import annotations
 
-from typing import Any, NamedTuple, Union, overload
+from typing import Any, NamedTuple, Sequence, Union, overload
 
 import numpy as np
 import pandas as pd
@@ -38,6 +38,20 @@ class Leg(NamedTuple):
     strike: float
     qty: int = 1
     premium: float = 0.0
+
+class PayoffProfile(NamedTuple):
+    spots: NDArray[np.float64]
+    pnl: NDArray[np.float64]
+    breakevens: list[float]
+    max_profit: float
+    max_loss: float
+    net_cost: float
+
+def payoff_profile(
+    legs: Sequence[Leg],
+    spot_range: tuple[float, float] | None = ...,
+    num_points: int = ...,
+) -> PayoffProfile: ...
 
 # ── price() ─────────────────────────────────────────────────────────────────
 

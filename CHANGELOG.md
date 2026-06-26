@@ -8,6 +8,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- `payoff_profile()`: the numeric companion to `plot.payoff()`. Same intrinsic-value model
+  but returns a `PayoffProfile` (sampled `spots`/`pnl`, interpolated `breakevens`, plus
+  `max_profit`, `max_loss` and `net_cost`) instead of a figure, so multi-leg strategies can
+  be screened without matplotlib. The grid auto-sizes around the strikes when `spot_range`
+  is omitted; `max_profit`/`max_loss` are taken over the sampled grid.
 - `strangle()`: per-expiry OTM strangle cost, breakevens and implied move, the companion to
   `straddle()`. The call leg is the `width`-th strike above spot and the put leg the `width`-th
   below (`width=1` is the nearest OTM pair); pure price arithmetic, no IV solve. An expiry is

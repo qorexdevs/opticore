@@ -104,10 +104,16 @@ pip install opticore[ibkr]  # adds ib_async dependency
 oc.plot.smile(enriched, expiry="2026-06-20")
 
 # Strategy payoff diagram
-oc.plot.payoff([
+legs = [
     oc.Leg("call", strike=105, qty=1, premium=3.50),
     oc.Leg("put",  strike=95,  qty=1, premium=2.10),
-])
+]
+oc.plot.payoff(legs)
+
+# Same strategy as numbers (no matplotlib) - break-evens, max profit/loss, net cost
+p = oc.payoff_profile(legs)
+p.breakevens  # [89.4, 110.6]
+p.net_cost    # 5.6
 
 # Greeks profile
 oc.plot.greek("delta", spot_range=(80, 120), strike=100,

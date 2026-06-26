@@ -54,6 +54,11 @@ status = oc.check_connection()
 connected: bool = status["connected"]
 msg: str = status["message"]
 
+# ── payoff_profile → PayoffProfile NamedTuple ───────────────────────────────
+profile = oc.payoff_profile([oc.Leg("call", strike=105, qty=1, premium=3.5)])
+profile_cost: float = profile.net_cost
+profile_bes: list[float] = profile.breakevens
+
 # ── plot helpers → (Figure, Axes) ───────────────────────────────────────────
 fig1, ax1 = oc_plot.smile(enriched)
 fig2, ax2 = oc_plot.payoff([oc.Leg("call", strike=105, qty=1, premium=3.5)])
@@ -80,5 +85,7 @@ def _assertions() -> None:
     assert fwd is not None
     assert connected is False or connected is True
     assert isinstance(msg, str)
+    assert isinstance(profile_cost, float)
+    assert isinstance(profile_bes, list)
     assert ax1 is not None and ax2 is not None and ax3 is not None
     assert fig1 is not None and fig2 is not None and fig3 is not None
