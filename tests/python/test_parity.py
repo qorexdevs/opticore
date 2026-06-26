@@ -586,6 +586,90 @@ class TestVertical:
         assert "net_debit" in out.columns
 
 
+class TestButterfly:
+    def test_wings_bracket_the_body(self):
+        # strikes step 3 (85..115), spot 100 -> body 100, wings 97 and 103
+        out = oc.butterfly(_synthetic_chain(underlying=100.0, expiry_days=(30,)))
+        r = out.iloc[0]
+        assert r["low_strike"] == 97.0
+        assert r["mid_strike"] == 100.0
+        assert r["high_strike"] == 103.0
+
+    def test_long_call_is_debit_with_capped_payoff(self):
+        chain = _synthetic_chain(underlying=100.0, expiry_days=(30,))
+        out = oc.butterfly(chain, kind="call", side="long")
+        r = out.iloc[0]
+        assert r["net_debit"] > 0  # pay to open
+        # peak at the body strike, loss capped at the debit
+        assert r["max_profit"] == pytest.approx(3.0 - r["net_debit"])
+        assert r["max_loss"] == pytest.approx(-r["net_debit"])
+        assert r["breakeven_low"] == pytest.approx(97.0 + r["net_debit"])
+        assert r["breakeven_high"] == pytest.approx(103.0 - r["net_debit"])
+
+    def test_short_is_credit_mirror_of_long(self):
+        chain = _synthetic_chain(underlying=100.0, expiry_days=(30,))
+        lng = oc.butterfly(chain, side="long").iloc[0]
+        sht = oc.butterfly(chain, side="short").iloc[0]
+        assert sht["net_debit"] == pytest.approx(-lng["net_debit"])
+        assert sht["max_profit"] == pytest.approx(-lng["max_loss"])
+        assert sht["max_loss"] == pytest.approx(-lng["max_profit"])
+
+    def test_call_and_put_butterfly_cost_match(self):
+        # symmetric strikes -> parity makes the two debits equal
+        chain = _synthetic_chain(underlying=100.0, expiry_days=(30,))
+        call = oc.butterfly(chain, kind="call").iloc[0]
+        put = oc.butterfly(chain, kind="put").iloc[0]
+        assert put["net_debit"] == pytest.approx(call["net_debit"])
+        assert put["max_profit"] == pytest.approx(call["max_profit"])
+
+    def test_width_widens_the_wings(self):
+        chain = _synthetic_chain(underlying=100.0, expiry_days=(30,))
+        w1 = oc.butterfly(chain, width=1).iloc[0]
+        w2 = oc.butterfly(chain, width=2).iloc[0]
+        assert w2["high_strike"] - w2["low_strike"] == pytest.approx(12.0)
+        # wider body pays more but tops out higher
+        assert w2["net_debit"] > w1["net_debit"]
+        assert w2["max_profit"] > w1["max_profit"]
+
+    def test_one_row_per_expiry_sorted(self):
+        out = oc.butterfly(_synthetic_chain(expiry_days=(120, 30, 60)))
+        assert len(out) == 3
+        assert list(out["tte"]) == sorted(out["tte"])
+
+    def test_returns_expected_columns(self):
+        out = oc.butterfly(_synthetic_chain())
+        for col in (
+            "expiry",
+            "tte",
+            "kind",
+            "side",
+            "low_strike",
+            "mid_strike",
+            "high_strike",
+            "underlying_price",
+            "net_debit",
+            "max_profit",
+            "max_loss",
+            "breakeven_low",
+            "breakeven_high",
+        ):
+            assert col in out.columns
+
+    def test_bad_args_raise(self):
+        with pytest.raises(ValueError):
+            oc.butterfly(_synthetic_chain(), width=0)
+        with pytest.raises(ValueError):
+            oc.butterfly(_synthetic_chain(), kind="iron")
+        with pytest.raises(ValueError):
+            oc.butterfly(_synthetic_chain(), side="flat")
+
+    def test_empty_chain_returns_empty_frame(self):
+        empty = pd.DataFrame(columns=["expiry", "strike", "kind", "underlying_price", "mid"])
+        out = oc.butterfly(empty)
+        assert out.empty
+        assert "net_debit" in out.columns
+
+
 class TestMaxPain:
     def test_symmetric_uniform_oi_pins_center(self):
         # 85..115 strikes, equal OI everywhere, spot 100 -> center strike wins

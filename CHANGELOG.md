@@ -8,6 +8,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- `butterfly()`: per-expiry butterfly spread cost, max profit/loss and the two breakevens,
+  the range-bound, defined-risk sibling of `vertical()`. The body sits at the strike nearest
+  spot and the wings `width` strikes either side; `side` is `long` (debit, profits if price
+  pins the body) or `short` (credit, profits past a wing) and `kind` picks call/put. Metrics
+  read straight off the expiry payoff, no IV solve.
 - `vertical()`: per-expiry vertical spread cost, max profit/loss and breakeven, the
   defined-risk companion to `straddle()`/`strangle()`. `kind` and `side` pick the four
   standard combinations (bull/bear call/put); the lower leg is the nearest strike at/below

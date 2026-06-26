@@ -469,6 +469,7 @@ from opticore import plot  # noqa: F401, E402
 from opticore.chain import (  # noqa: E402
     TermSlope,
     atm_iv,
+    butterfly,
     check_connection,
     dollar_volume,
     enrich,
@@ -510,6 +511,7 @@ __all__ = [
     "straddle",
     "strangle",
     "vertical",
+    "butterfly",
     "max_pain",
     "pcr",
     "turnover",

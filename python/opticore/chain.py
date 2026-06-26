@@ -1049,6 +1049,148 @@ def vertical(
     return pd.DataFrame(rows, columns=cols)
 
 
+def butterfly(
+    chain: pd.DataFrame,
+    kind: str = "call",
+    side: str = "long",
+    width: int = 1,
+    price_col: str = "mid",
+) -> pd.DataFrame:
+    """Per-expiry butterfly spread cost, max profit/loss and breakevens.
+
+    A butterfly is the range-bound, defined-risk cousin of the vertical: it
+    buys one option, sells two at a middle strike and buys one further out, all
+    of the same kind and expiry. The body sits at the strike nearest spot and
+    the wings ``width`` strikes either side, so the payoff tents up to a peak at
+    the middle strike and is flat outside the wings whatever the strike spacing.
+
+    ``side='long'`` pays to open (``net_debit > 0``) and profits if price pins
+    the middle strike; ``side='short'`` collects (``net_debit < 0``) and profits
+    if price runs past either wing. ``kind`` picks call or put butterflies, which
+    share the same payoff shape. Max profit, max loss and the two breakevens are
+    read straight off the expiry payoff - flat outside the wings, linear between
+    the kinks - so no IV solve is needed. Only strikes quoting both a call and a
+    put are used; an expiry is dropped when the body has no ``width`` strikes on
+    one of its sides.
+
+    Parameters
+    ----------
+    chain : pd.DataFrame
+        Same schema as ``straddle`` / ``vertical``.
+    kind : str
+        ``'call'`` or ``'put'`` (default: 'call').
+    side : str
+        ``'long'`` or ``'short'`` (default: 'long').
+    width : int
+        How many strikes each wing sits from the body (default: 1). Must be >= 1.
+    price_col : str
+        Which price to use (default: 'mid').
+
+    Returns
+    -------
+    pd.DataFrame
+        Columns: expiry, tte, kind, side, low_strike, mid_strike, high_strike,
+        underlying_price, net_debit, max_profit, max_loss, breakeven_low,
+        breakeven_high. One row per expiry, sorted by expiry. ``net_debit`` is
+        positive for a long (debit) butterfly, negative for a short (credit);
+        ``max_loss`` is negative. Breakevens are ``nan`` when a segment is flat.
+    """
+    if width < 1:
+        raise ValueError("width must be >= 1")
+    kind = kind.lower()
+    side = side.lower()
+    if kind not in ("call", "put"):
+        raise ValueError("kind must be 'call' or 'put'")
+    if side not in ("long", "short"):
+        raise ValueError("side must be 'long' or 'short'")
+    cols = [
+        "expiry",
+        "tte",
+        "kind",
+        "side",
+        "low_strike",
+        "mid_strike",
+        "high_strike",
+        "underlying_price",
+        "net_debit",
+        "max_profit",
+        "max_loss",
+        "breakeven_low",
+        "breakeven_high",
+    ]
+    p = _pivot_call_put(chain, price_col)
+    if p.empty:
+        return pd.DataFrame(columns=cols)
+
+    now = datetime.now(timezone.utc)
+    expiry_dt = pd.to_datetime(p["expiry"], utc=True)
+    p = p.assign(_tte=(expiry_dt - now).dt.total_seconds() / (365.25 * 24 * 3600))
+
+    prem_col = "call_mid" if kind == "call" else "put_mid"
+    sign = 1.0 if side == "long" else -1.0
+
+    rows = []
+    for exp, grp in p.groupby("expiry", sort=True):
+        grp = grp.sort_values("strike").reset_index(drop=True)
+        spot = float(grp["underlying_price"].iloc[0])
+        mid_idx = int((grp["strike"] - spot).abs().idxmin())
+        lo_idx = mid_idx - width
+        hi_idx = mid_idx + width
+        if lo_idx < 0 or hi_idx >= len(grp):
+            continue
+
+        k_low = float(grp["strike"].iloc[lo_idx])
+        k_mid = float(grp["strike"].iloc[mid_idx])
+        k_high = float(grp["strike"].iloc[hi_idx])
+        prem_low = float(grp[prem_col].iloc[lo_idx])
+        prem_mid = float(grp[prem_col].iloc[mid_idx])
+        prem_high = float(grp[prem_col].iloc[hi_idx])
+
+        # qty +1/-2/+1 for a long butterfly, flipped for a short
+        net_cost = sign * (prem_low - 2.0 * prem_mid + prem_high)
+
+        def _pnl(s: float) -> float:
+            if kind == "call":
+                legs = max(s - k_low, 0.0) - 2.0 * max(s - k_mid, 0.0) + max(s - k_high, 0.0)
+            else:
+                legs = max(k_low - s, 0.0) - 2.0 * max(k_mid - s, 0.0) + max(k_high - s, 0.0)
+            return sign * legs - net_cost
+
+        pnl_low = _pnl(k_low)
+        pnl_mid = _pnl(k_mid)
+        pnl_high = _pnl(k_high)
+        max_profit = max(pnl_low, pnl_mid, pnl_high)
+        max_loss = min(pnl_low, pnl_mid, pnl_high)
+
+        def _cross(ka: float, pa: float, kb: float, pb: float) -> float:
+            if pa == pb or (pa > 0) == (pb > 0):
+                return float("nan")
+            return ka + (0.0 - pa) * (kb - ka) / (pb - pa)
+
+        be_low = _cross(k_low, pnl_low, k_mid, pnl_mid)
+        be_high = _cross(k_mid, pnl_mid, k_high, pnl_high)
+
+        rows.append(
+            {
+                "expiry": exp,
+                "tte": float(grp["_tte"].iloc[mid_idx]),
+                "kind": kind,
+                "side": side,
+                "low_strike": k_low,
+                "mid_strike": k_mid,
+                "high_strike": k_high,
+                "underlying_price": spot,
+                "net_debit": net_cost,
+                "max_profit": max_profit,
+                "max_loss": max_loss,
+                "breakeven_low": be_low,
+                "breakeven_high": be_high,
+            }
+        )
+
+    return pd.DataFrame(rows, columns=cols)
+
+
 def max_pain(chain: pd.DataFrame) -> pd.DataFrame:
     """Per-expiry max-pain strike from open interest.
 

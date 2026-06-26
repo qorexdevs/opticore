@@ -101,6 +101,13 @@ def vertical(
     width: int = ...,
     price_col: str = ...,
 ) -> pd.DataFrame: ...
+def butterfly(
+    chain: pd.DataFrame,
+    kind: str = ...,
+    side: str = ...,
+    width: int = ...,
+    price_col: str = ...,
+) -> pd.DataFrame: ...
 def max_pain(
     chain: pd.DataFrame,
 ) -> pd.DataFrame: ...
