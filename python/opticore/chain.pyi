@@ -98,6 +98,9 @@ def pcr(
 def turnover(
     chain: pd.DataFrame,
 ) -> pd.DataFrame: ...
+def liquidity(
+    chain: pd.DataFrame,
+) -> pd.DataFrame: ...
 def dollar_volume(
     chain: pd.DataFrame,
     price_col: str = ...,

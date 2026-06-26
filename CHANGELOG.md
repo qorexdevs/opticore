@@ -8,6 +8,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- `liquidity()`: per-expiry bid-ask spread as a tradeability gauge, both absolute
+  (`ask - bid`) and relative to mid, reported as the median across the expiry's quotes
+  plus the widest relative spread so one untradeable strike can't hide behind a decent
+  median. Pure arithmetic, no IV solve; `mid` used when present, else the midpoint,
+  crossed or non-positive markets dropped. Returns expiry, underlying_price, n_quotes,
+  median_spread, median_rel_spread, max_rel_spread.
 - `dollar_volume()`: per-expiry premium in dollars traded and standing, call and put
   side. Where `pcr()` and `turnover()` count contracts, this weights each strike by
   its price, so a few expensive contracts can outweigh a swarm of cheap wings and the

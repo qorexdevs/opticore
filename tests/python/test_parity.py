@@ -722,6 +722,92 @@ class TestDollarVolume:
         assert "dollar_volume_pcr" in out.columns
 
 
+class TestLiquidity:
+    def test_relative_spread_from_explicit_quotes(self):
+        chain = pd.DataFrame(
+            [
+                {
+                    "expiry": "2026-07-01",
+                    "strike": 100.0,
+                    "kind": "call",
+                    "bid": 1.90,
+                    "ask": 2.10,
+                    "mid": 2.0,
+                    "underlying_price": 100.0,
+                },
+                {
+                    "expiry": "2026-07-01",
+                    "strike": 105.0,
+                    "kind": "call",
+                    "bid": 0.95,
+                    "ask": 1.05,
+                    "mid": 1.0,
+                    "underlying_price": 100.0,
+                },
+            ]
+        )
+        r = oc.liquidity(chain).iloc[0]
+        assert r["n_quotes"] == 2
+        # spreads 0.20 and 0.10 -> median 0.15; rel 0.10 and 0.10 -> median 0.10
+        assert r["median_spread"] == pytest.approx(0.15)
+        assert r["median_rel_spread"] == pytest.approx(0.10)
+        assert r["max_rel_spread"] == pytest.approx(0.10)
+
+    def test_widest_strike_shows_in_max_not_median(self):
+        chain = pd.DataFrame(
+            [
+                {"expiry": "2026-07-01", "strike": 100.0, "kind": "call",
+                 "bid": 1.98, "ask": 2.02, "mid": 2.0, "underlying_price": 100.0},
+                {"expiry": "2026-07-01", "strike": 105.0, "kind": "call",
+                 "bid": 1.98, "ask": 2.02, "mid": 2.0, "underlying_price": 100.0},
+                {"expiry": "2026-07-01", "strike": 110.0, "kind": "call",
+                 "bid": 0.10, "ask": 0.50, "mid": 0.30, "underlying_price": 100.0},
+            ]
+        )
+        r = oc.liquidity(chain).iloc[0]
+        assert r["median_rel_spread"] == pytest.approx(0.02)
+        # the wide strike: 0.40 / 0.30
+        assert r["max_rel_spread"] == pytest.approx(0.40 / 0.30)
+
+    def test_falls_back_to_midpoint_when_no_mid_column(self):
+        chain = pd.DataFrame(
+            [
+                {"expiry": "2026-07-01", "strike": 100.0, "kind": "call",
+                 "bid": 1.0, "ask": 3.0, "underlying_price": 100.0},
+            ]
+        )
+        r = oc.liquidity(chain).iloc[0]
+        # midpoint 2.0, spread 2.0 -> rel 1.0
+        assert r["median_rel_spread"] == pytest.approx(1.0)
+
+    def test_crossed_and_nonpositive_quotes_dropped(self):
+        chain = pd.DataFrame(
+            [
+                {"expiry": "2026-07-01", "strike": 100.0, "kind": "call",
+                 "bid": 1.9, "ask": 2.1, "mid": 2.0, "underlying_price": 100.0},
+                {"expiry": "2026-07-01", "strike": 105.0, "kind": "call",
+                 "bid": 2.0, "ask": 1.0, "mid": 1.5, "underlying_price": 100.0},
+                {"expiry": "2026-07-01", "strike": 110.0, "kind": "call",
+                 "bid": 0.0, "ask": 0.0, "mid": 0.0, "underlying_price": 100.0},
+            ]
+        )
+        r = oc.liquidity(chain).iloc[0]
+        assert r["n_quotes"] == 1
+        assert r["median_spread"] == pytest.approx(0.2)
+
+    def test_one_row_per_expiry_sorted(self):
+        out = oc.liquidity(_synthetic_chain(expiry_days=(120, 30, 60), spread_bps=100.0))
+        assert len(out) == 3
+        assert list(out["expiry"]) == sorted(out["expiry"])
+        assert (out["median_rel_spread"] > 0).all()
+
+    def test_missing_bid_ask_returns_empty(self):
+        chain = _synthetic_chain(expiry_days=(30,)).drop(columns=["bid", "ask"])
+        out = oc.liquidity(chain)
+        assert out.empty
+        assert "median_rel_spread" in out.columns
+
+
 class TestOIWalls:
     def test_picks_highest_oi_strike_each_side(self):
         chain = pd.DataFrame(
@@ -1169,6 +1255,11 @@ def test_pcr_in_public_api():
 def test_turnover_in_public_api():
     assert hasattr(oc, "turnover")
     assert callable(oc.turnover)
+
+
+def test_liquidity_in_public_api():
+    assert hasattr(oc, "liquidity")
+    assert callable(oc.liquidity)
 
 
 def test_oi_walls_in_public_api():

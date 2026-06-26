@@ -1068,6 +1068,70 @@ def turnover(chain: pd.DataFrame) -> pd.DataFrame:
     return pd.DataFrame(rows, columns=cols)
 
 
+def liquidity(chain: pd.DataFrame) -> pd.DataFrame:
+    """Per-expiry bid-ask spread, a liquidity gauge for picking tradeable strikes.
+
+    A tight spread means you can work an order near mid; a wide one is a tax on
+    every fill. Reported per expiry as the median across that expiry's quotes,
+    both absolute (``ask - bid``) and relative to mid, since a 0.10 spread is
+    cheap on a 5.00 option and dear on a 0.20 one. The widest relative spread is
+    kept too, to flag an expiry with one untradeable strike hiding behind an
+    otherwise decent median.
+
+    Pure arithmetic, no IV solve. Needs ``bid`` and ``ask``; ``mid`` is used when
+    present, otherwise the midpoint is taken. Quotes with a missing or crossed
+    (``bid > ask``) market or a non-positive mid are dropped, and an expiry left
+    with nothing is omitted.
+
+    Parameters
+    ----------
+    chain : pd.DataFrame
+        Same schema as ``max_pain`` / ``enrich``; needs ``bid`` and ``ask``.
+
+    Returns
+    -------
+    pd.DataFrame
+        Columns: expiry, underlying_price, n_quotes, median_spread,
+        median_rel_spread, max_rel_spread. One row per expiry, sorted by expiry.
+    """
+    cols = [
+        "expiry",
+        "underlying_price",
+        "n_quotes",
+        "median_spread",
+        "median_rel_spread",
+        "max_rel_spread",
+    ]
+    if chain.empty or "bid" not in chain.columns or "ask" not in chain.columns:
+        return pd.DataFrame(columns=cols)
+
+    df = chain.copy()
+    mid = df["mid"] if "mid" in df.columns else (df["bid"] + df["ask"]) / 2.0
+    df["_mid"] = mid
+    df = df.dropna(subset=["bid", "ask", "_mid"])
+    df = df[(df["ask"] >= df["bid"]) & (df["_mid"] > 0)]
+    if df.empty:
+        return pd.DataFrame(columns=cols)
+
+    df["_spread"] = df["ask"] - df["bid"]
+    df["_rel"] = df["_spread"] / df["_mid"]
+
+    rows = []
+    for exp, grp in df.groupby("expiry", sort=True):
+        rows.append(
+            {
+                "expiry": exp,
+                "underlying_price": float(grp["underlying_price"].iloc[0]),
+                "n_quotes": int(len(grp)),
+                "median_spread": float(grp["_spread"].median()),
+                "median_rel_spread": float(grp["_rel"].median()),
+                "max_rel_spread": float(grp["_rel"].max()),
+            }
+        )
+
+    return pd.DataFrame(rows, columns=cols)
+
+
 def dollar_volume(
     chain: pd.DataFrame,
     price_col: str = "mid",
