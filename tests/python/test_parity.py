@@ -423,6 +423,87 @@ class TestStraddle:
         assert "straddle_price" in out.columns
 
 
+class TestStrangle:
+    def test_legs_are_first_otm_pair(self):
+        # strikes 85..115 step 3, spot 100 -> nearest OTM call 103, put 97
+        out = oc.strangle(_synthetic_chain(underlying=100.0))
+        assert (out["call_strike"] == 103.0).all()
+        assert (out["put_strike"] == 97.0).all()
+
+    def test_width_two_steps_further_out(self):
+        out = oc.strangle(_synthetic_chain(underlying=100.0), width=2)
+        assert (out["call_strike"] == 106.0).all()
+        assert (out["put_strike"] == 94.0).all()
+
+    def test_price_equals_call_plus_put(self):
+        chain = _synthetic_chain(underlying=100.0, expiry_days=(30,))
+        out = oc.strangle(chain)
+        exp = chain["expiry"].iloc[0]
+        call = float(
+            chain[
+                (chain["strike"] == 103.0) & (chain["kind"] == "call") & (chain["expiry"] == exp)
+            ]["mid"].iloc[0]
+        )
+        put = float(
+            chain[(chain["strike"] == 97.0) & (chain["kind"] == "put") & (chain["expiry"] == exp)][
+                "mid"
+            ].iloc[0]
+        )
+        assert out["strangle_price"].iloc[0] == pytest.approx(call + put, abs=1e-9)
+
+    def test_breakevens_one_width_outside_each_strike(self):
+        out = oc.strangle(_synthetic_chain())
+        r = out.iloc[0]
+        assert r["breakeven_high"] == pytest.approx(r["call_strike"] + r["strangle_price"])
+        assert r["breakeven_low"] == pytest.approx(r["put_strike"] - r["strangle_price"])
+
+    def test_implied_move_is_cost_over_spot(self):
+        out = oc.strangle(_synthetic_chain(underlying=100.0))
+        r = out.iloc[0]
+        assert r["implied_move"] == pytest.approx(r["strangle_price"] / r["underlying_price"])
+
+    def test_cheaper_than_straddle(self):
+        chain = _synthetic_chain(underlying=100.0, expiry_days=(30,))
+        strad = oc.straddle(chain)["straddle_price"].iloc[0]
+        strang = oc.strangle(chain)["strangle_price"].iloc[0]
+        assert strang < strad
+
+    def test_one_row_per_expiry_sorted(self):
+        out = oc.strangle(_synthetic_chain(expiry_days=(120, 30, 60)))
+        assert len(out) == 3
+        assert list(out["tte"]) == sorted(out["tte"])
+
+    def test_width_too_far_drops_expiry(self):
+        # 5 strikes each side of spot; width 6 has nothing that far out
+        out = oc.strangle(_synthetic_chain(underlying=100.0), width=6)
+        assert out.empty
+
+    def test_width_below_one_raises(self):
+        with pytest.raises(ValueError):
+            oc.strangle(_synthetic_chain(), width=0)
+
+    def test_returns_expected_columns(self):
+        out = oc.strangle(_synthetic_chain())
+        for col in (
+            "expiry",
+            "tte",
+            "put_strike",
+            "call_strike",
+            "underlying_price",
+            "strangle_price",
+            "breakeven_low",
+            "breakeven_high",
+            "implied_move",
+        ):
+            assert col in out.columns
+
+    def test_empty_chain_returns_empty_frame(self):
+        empty = pd.DataFrame(columns=["expiry", "strike", "kind", "underlying_price", "mid"])
+        out = oc.strangle(empty)
+        assert out.empty
+        assert "strangle_price" in out.columns
+
+
 class TestMaxPain:
     def test_symmetric_uniform_oi_pins_center(self):
         # 85..115 strikes, equal OI everywhere, spot 100 -> center strike wins
@@ -1391,6 +1472,11 @@ def test_rr_bf_in_public_api():
 def test_straddle_in_public_api():
     assert hasattr(oc, "straddle")
     assert callable(oc.straddle)
+
+
+def test_strangle_in_public_api():
+    assert hasattr(oc, "strangle")
+    assert callable(oc.strangle)
 
 
 def test_max_pain_in_public_api():

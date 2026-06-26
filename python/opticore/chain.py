@@ -830,6 +830,92 @@ def straddle(
     return pd.DataFrame(rows, columns=cols)
 
 
+def strangle(
+    chain: pd.DataFrame,
+    price_col: str = "mid",
+    width: int = 1,
+) -> pd.DataFrame:
+    """Per-expiry OTM strangle cost, breakevens and the implied move.
+
+    A strangle buys an out-of-the-money call above spot and an out-of-the-money
+    put below it - cheaper than the ATM straddle but needing a larger move to pay
+    off. For each expiry the call leg is the ``width``-th strike above spot and
+    the put leg the ``width``-th strike below; ``width=1`` is the nearest pair of
+    OTM strikes, ``width=2`` skips one out, and so on. ``strangle_price`` is the
+    two legs summed, breakevens sit one strangle width outside each strike, and
+    ``implied_move`` is the cost as a fraction of spot.
+
+    Like :func:`straddle` this is pure price arithmetic - no IV solve - and only
+    strikes quoting both a call and a put are considered. An expiry is dropped
+    when it has no strike ``width`` steps out on either side.
+
+    Parameters
+    ----------
+    chain : pd.DataFrame
+        Same schema as ``straddle`` / ``enrich``.
+    price_col : str
+        Which price to use (default: 'mid').
+    width : int
+        How many strikes out of the money each leg sits, counting from spot
+        (default: 1, the nearest OTM pair). Must be >= 1.
+
+    Returns
+    -------
+    pd.DataFrame
+        Columns: expiry, tte, put_strike, call_strike, underlying_price,
+        strangle_price, breakeven_low, breakeven_high, implied_move. One row per
+        expiry, sorted by expiry.
+    """
+    if width < 1:
+        raise ValueError("width must be >= 1")
+    cols = [
+        "expiry",
+        "tte",
+        "put_strike",
+        "call_strike",
+        "underlying_price",
+        "strangle_price",
+        "breakeven_low",
+        "breakeven_high",
+        "implied_move",
+    ]
+    p = _pivot_call_put(chain, price_col)
+    if p.empty:
+        return pd.DataFrame(columns=cols)
+
+    now = datetime.now(timezone.utc)
+    expiry_dt = pd.to_datetime(p["expiry"], utc=True)
+    p = p.assign(_tte=(expiry_dt - now).dt.total_seconds() / (365.25 * 24 * 3600))
+
+    rows = []
+    for exp, grp in p.groupby("expiry", sort=True):
+        spot = float(grp["underlying_price"].iloc[0])
+        calls = grp[grp["strike"] > spot].sort_values("strike")
+        puts = grp[grp["strike"] < spot].sort_values("strike", ascending=False)
+        if len(calls) < width or len(puts) < width:
+            continue
+        call = calls.iloc[width - 1]
+        put = puts.iloc[width - 1]
+        call_strike = float(call["strike"])
+        put_strike = float(put["strike"])
+        cost = float(call["call_mid"] + put["put_mid"])
+        rows.append(
+            {
+                "expiry": exp,
+                "tte": float(call["_tte"]),
+                "put_strike": put_strike,
+                "call_strike": call_strike,
+                "underlying_price": spot,
+                "strangle_price": cost,
+                "breakeven_low": put_strike - cost,
+                "breakeven_high": call_strike + cost,
+                "implied_move": cost / spot if spot > 0 else float("nan"),
+            }
+        )
+
+    return pd.DataFrame(rows, columns=cols)
+
+
 def max_pain(chain: pd.DataFrame) -> pd.DataFrame:
     """Per-expiry max-pain strike from open interest.
 

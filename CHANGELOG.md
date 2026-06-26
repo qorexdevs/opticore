@@ -8,6 +8,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- `strangle()`: per-expiry OTM strangle cost, breakevens and implied move, the companion to
+  `straddle()`. The call leg is the `width`-th strike above spot and the put leg the `width`-th
+  below (`width=1` is the nearest OTM pair); pure price arithmetic, no IV solve. An expiry is
+  dropped when neither side has a strike that far out.
 - `plot.term_structure()`: ATM IV against time to expiry from `atm_iv()`, one point
   per expiry so contango and backwardation read off the slope. With `fit=True` (default)
   the `term_slope()` line is overlaid and its shape labelled. Returns `(fig, ax)` like
