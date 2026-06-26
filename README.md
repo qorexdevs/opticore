@@ -112,6 +112,12 @@ oc.plot.payoff([
 # Greeks profile
 oc.plot.greek("delta", spot_range=(80, 120), strike=100,
               expiry=0.5, rate=0.05, vol=0.20, kind="both")
+
+# ATM IV term structure (contango vs backwardation, with a fitted slope)
+oc.plot.term_structure(enriched)
+
+# Per-expiry bid-ask spread, so you can see which tenors are worth working
+oc.plot.liquidity(enriched)
 ```
 
 ## Installation Options
