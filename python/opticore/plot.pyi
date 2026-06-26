@@ -43,3 +43,8 @@ def greek(
     num_points: int = ...,
     ax: Axes | None = ...,
 ) -> tuple[Figure, Axes]: ...
+def liquidity(
+    chain: pd.DataFrame,
+    relative: bool = ...,
+    ax: Axes | None = ...,
+) -> tuple[Figure, Axes]: ...

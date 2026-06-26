@@ -203,3 +203,60 @@ class TestGreek:
         )
         assert out_fig is fig
         assert out_ax is ax
+
+
+@pytest.fixture
+def quote_chain():
+    """Synthetic chain with bid/ask for liquidity tests, two expiries."""
+    rows = []
+    for exp, spread in [
+        (pd.Timestamp("2026-05-01", tz="UTC"), 0.10),
+        (pd.Timestamp("2026-06-01", tz="UTC"), 0.40),
+    ]:
+        for k in np.arange(95.0, 106.0):
+            mid = 2.0 + abs(k - 100) * 0.3
+            rows.append(
+                {
+                    "strike": k,
+                    "expiry": exp,
+                    "kind": "call",
+                    "bid": mid - spread / 2,
+                    "ask": mid + spread / 2,
+                    "underlying_price": 100.0,
+                }
+            )
+    return pd.DataFrame(rows)
+
+
+class TestLiquidity:
+    """Test oc.plot.liquidity()."""
+
+    def test_returns_fig_ax_tuple(self, quote_chain):
+        import matplotlib.axes
+        import matplotlib.figure
+
+        fig, ax = oc_plot.liquidity(quote_chain)
+        assert isinstance(fig, matplotlib.figure.Figure)
+        assert isinstance(ax, matplotlib.axes.Axes)
+
+    def test_one_bar_per_expiry(self, quote_chain):
+        fig, ax = oc_plot.liquidity(quote_chain)
+        assert len(ax.patches) == 2
+
+    def test_relative_vs_absolute_ylabel(self, quote_chain):
+        _, ax_rel = oc_plot.liquidity(quote_chain, relative=True)
+        assert "%" in ax_rel.get_ylabel()
+        _, ax_abs = oc_plot.liquidity(quote_chain, relative=False)
+        assert "%" not in ax_abs.get_ylabel()
+
+    def test_custom_ax(self, quote_chain):
+        import matplotlib.pyplot as plt
+
+        fig, ax = plt.subplots()
+        out_fig, out_ax = oc_plot.liquidity(quote_chain, ax=ax)
+        assert out_fig is fig
+        assert out_ax is ax
+
+    def test_empty_raises(self):
+        with pytest.raises(ValueError, match="No liquidity data"):
+            oc_plot.liquidity(pd.DataFrame({"strike": [100]}))

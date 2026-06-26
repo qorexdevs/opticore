@@ -257,3 +257,75 @@ def greek(
 
     fig.tight_layout()
     return fig, ax
+
+
+def liquidity(
+    chain,
+    relative: bool = True,
+    ax=None,
+):
+    """Plot per-expiry bid-ask spread from a chain DataFrame.
+
+    Bars show the median spread for each expiry (the typical tax on a fill),
+    with a marker for that expiry's widest relative spread so a single
+    untradeable strike hiding behind a decent median still shows up. Shorter
+    bars are the liquid expiries worth working an order in.
+
+    Parameters
+    ----------
+    chain : pd.DataFrame
+        Same schema as ``oc.liquidity``; needs ``bid`` and ``ask``.
+    relative : bool
+        Plot the spread relative to mid (percent of price) when True, the
+        default, so cheap and dear options compare fairly. When False, plot the
+        absolute spread in price terms.
+    ax : matplotlib.axes.Axes or None
+        Axes to plot on. If None, creates a new figure.
+
+    Returns
+    -------
+    (fig, ax) : tuple[matplotlib.figure.Figure, matplotlib.axes.Axes]
+        Standard matplotlib convention. Use ``ax`` to add annotations,
+        ``fig`` to save / display.
+    """
+    plt = _get_plt()
+    import pandas as pd
+
+    from opticore.chain import liquidity as compute_liquidity
+
+    liq = compute_liquidity(chain)
+    if liq.empty:
+        raise ValueError("No liquidity data to plot after filtering.")
+
+    labels = [
+        pd.Timestamp(e).strftime("%Y-%m-%d") if hasattr(e, "strftime") else str(e)
+        for e in liq["expiry"]
+    ]
+    if relative:
+        median = liq["median_rel_spread"] * 100
+        widest = liq["max_rel_spread"] * 100
+        ylabel = "Bid-Ask Spread (% of mid)"
+    else:
+        median = liq["median_spread"]
+        widest = None
+        ylabel = "Bid-Ask Spread (price)"
+
+    if ax is None:
+        fig, ax = plt.subplots(1, 1, figsize=(10, 6))
+    else:
+        fig = ax.get_figure()
+
+    pos = np.arange(len(labels))
+    ax.bar(pos, median, color="tab:blue", alpha=0.8, label="median")
+    if widest is not None:
+        ax.scatter(pos, widest, color="tab:red", marker="_", s=200, zorder=3, label="widest")
+
+    ax.set_xticks(pos)
+    ax.set_xticklabels(labels, rotation=45, ha="right", fontsize=9)
+    ax.set_ylabel(ylabel)
+    ax.set_title("Liquidity by Expiry")
+    ax.legend(fontsize=9)
+    ax.grid(True, axis="y", alpha=0.3)
+
+    fig.tight_layout()
+    return fig, ax

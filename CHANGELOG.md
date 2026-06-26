@@ -8,6 +8,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- `plot.liquidity()`: bar chart of the per-expiry bid-ask spread from `liquidity()`,
+  with a marker for each expiry's widest relative spread so a single untradeable strike
+  still shows. `relative=True` (default) plots percent of mid, `relative=False` the
+  absolute spread. Returns `(fig, ax)` like the other plotters.
 - `liquidity_by_strike()`: the per-strike view behind `liquidity()`, one row per
   (expiry, strike, kind) with `bid`, `ask`, `mid`, absolute `spread` and `rel_spread`,
   no aggregation - the raw distribution the median collapses, for picking the actual
