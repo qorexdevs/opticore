@@ -161,6 +161,15 @@ Each has a `*_by_strike` companion (`pcr_by_strike`, `turnover_by_strike`,
 `oi_profile`, `volume_profile`, ...) that collapses the expiry axis and keeps a
 row per strike when you want the strike map instead of the per-expiry summary.
 
+One more reads the Greeks rather than raw counts, so it wants an enriched chain:
+
+```python
+enriched = oc.enrich(chain, rate=0.05)
+
+# Dealer gamma exposure: where hedging flow dampens or amplifies moves
+oc.gamma_exposure(enriched)  # => call_gex, put_gex, net_gex, gamma_wall_strike
+```
+
 ## Installation Options
 
 ```bash

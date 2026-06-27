@@ -2048,6 +2048,70 @@ def test_strangle_in_public_api():
     assert callable(oc.strangle)
 
 
+class TestGammaExposure:
+    def _enriched(self, **kw):
+        return oc.enrich(_synthetic_chain(**kw), rate=0.05)
+
+    def test_returns_expected_columns(self):
+        out = oc.gamma_exposure(self._enriched(expiry_days=(30,)))
+        for col in (
+            "expiry",
+            "underlying_price",
+            "call_gex",
+            "put_gex",
+            "net_gex",
+            "gamma_wall_strike",
+        ):
+            assert col in out.columns
+
+    def test_one_row_per_expiry_sorted(self):
+        out = oc.gamma_exposure(self._enriched(expiry_days=(120, 30, 60)))
+        assert len(out) == 3
+        assert list(out["expiry"]) == sorted(out["expiry"])
+
+    def test_call_gex_positive_put_gex_negative(self):
+        # gamma is positive for both sides, so the call leg adds and the put leg
+        # subtracts under the long-call / short-put convention.
+        r = oc.gamma_exposure(self._enriched(expiry_days=(30,))).iloc[0]
+        assert r["call_gex"] > 0
+        assert r["put_gex"] < 0
+
+    def test_symmetric_book_nets_near_zero(self):
+        # equal OI on both sides + identical per-strike gamma -> net cancels
+        r = oc.gamma_exposure(self._enriched(expiry_days=(30,))).iloc[0]
+        assert r["net_gex"] == pytest.approx(0.0, abs=abs(r["call_gex"]) * 1e-6)
+
+    def test_call_heavy_book_has_positive_net(self):
+        chain = self._enriched(expiry_days=(30,))
+        chain.loc[chain["kind"] == "call", "open_interest"] *= 3
+        r = oc.gamma_exposure(chain).iloc[0]
+        assert r["net_gex"] > 0
+
+    def test_gamma_wall_near_atm(self):
+        # gamma peaks at-the-money, so the gross-gamma wall sits at the strike
+        # closest to spot (100 with the 85..115 grid)
+        chain = self._enriched(underlying=100.0, expiry_days=(30,), n_strikes=11)
+        r = oc.gamma_exposure(chain).iloc[0]
+        assert r["gamma_wall_strike"] == pytest.approx(100.0)
+
+    def test_scales_with_contract_size(self):
+        chain = self._enriched(expiry_days=(30,))
+        base = oc.gamma_exposure(chain, contract_size=100.0).iloc[0]["call_gex"]
+        doubled = oc.gamma_exposure(chain, contract_size=200.0).iloc[0]["call_gex"]
+        assert doubled == pytest.approx(2.0 * base)
+
+    def test_no_gamma_column_returns_empty(self):
+        out = oc.gamma_exposure(_synthetic_chain(expiry_days=(30,)))
+        assert out.empty
+        assert "gamma_wall_strike" in out.columns
+
+    def test_zero_oi_expiry_skipped(self):
+        chain = self._enriched(expiry_days=(30,))
+        chain["open_interest"] = 0
+        out = oc.gamma_exposure(chain)
+        assert out.empty
+
+
 def test_max_pain_in_public_api():
     assert hasattr(oc, "max_pain")
     assert callable(oc.max_pain)
@@ -2091,3 +2155,8 @@ def test_volume_profile_in_public_api():
 def test_volume_walls_in_public_api():
     assert hasattr(oc, "volume_walls")
     assert callable(oc.volume_walls)
+
+
+def test_gamma_exposure_in_public_api():
+    assert hasattr(oc, "gamma_exposure")
+    assert callable(oc.gamma_exposure)

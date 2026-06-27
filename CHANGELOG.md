@@ -8,6 +8,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- `gamma_exposure()`: per-expiry dealer gamma exposure (GEX) from open interest and the
+  enriched `gamma` column. Treats dealers as long call gamma and short put gamma, scales
+  each leg by `gamma * open_interest * contract_size * spot**2 * 0.01` (dollar gamma per 1%
+  move) and reports `call_gex`, `put_gex`, `net_gex` and the `gamma_wall_strike` carrying the
+  most absolute exposure. Positive net GEX dampens moves, negative amplifies them. Needs an
+  enriched chain (so it sees `gamma`), unlike the pure-OI `max_pain`/`oi_walls`.
 - `collar()`: per-expiry collar on a held long position - buys a protective put `gap` strikes
   below spot and sells a covered call `gap` above it, reporting `net_debit` (put paid less call
   collected, near zero for a zero-cost collar), the floored `max_loss`, capped `max_profit` and
