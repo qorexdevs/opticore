@@ -8,6 +8,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- `dollar_volume_by_strike()`: per-strike premium in dollars, the strike-level companion to
+  `dollar_volume()`. Collapses the expiry axis and keeps a row per strike, so a few deep ITM
+  strikes that dominate the dollar book but barely register in the contract count show up.
+  Same NaN rules as `dollar_volume()`: dollar PCR is NaN when the call side is zero, row kept.
 - `iron_condor()`: per-expiry iron condor cost, max profit/loss and the two breakevens,
   built from two out-of-the-money credit spreads (puts below spot, calls above). The short
   legs sit `gap` strikes either side of spot and the long wings `width` further out; `side`

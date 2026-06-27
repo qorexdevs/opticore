@@ -1873,6 +1873,99 @@ def dollar_volume(
     return pd.DataFrame(rows, columns=cols)
 
 
+def dollar_volume_by_strike(
+    chain: pd.DataFrame,
+    price_col: str = "mid",
+    contract_size: float = 100.0,
+) -> pd.DataFrame:
+    """Per-strike premium in dollars, the strike-level view behind ``dollar_volume``.
+
+    ``dollar_volume`` sums premium per expiry, which tracks where the money sits
+    over time but hides the strikes it clusters at. This collapses the expiry axis
+    and keeps a row per strike, so you can see which strikes hold the most premium
+    rather than the most contracts - a few deep ITM strikes can dominate the dollar
+    book while barely registering in the contract count.
+
+    Same arithmetic and NaN rules as ``dollar_volume``: ``open_interest`` and the
+    price column are required, ``volume`` optional and its dollar figure NaN when
+    missing. Strikes with no quoted price are dropped. A dollar PCR is NaN when the
+    call side is zero but the row is still emitted so the put total stays visible.
+
+    Parameters
+    ----------
+    chain : pd.DataFrame
+        Same schema as ``dollar_volume``; needs ``open_interest``, ``strike``,
+        ``kind`` and ``price_col``.
+    price_col : str
+        Which price to weight by (default: 'mid').
+    contract_size : float
+        Multiplier per contract (default: 100, one equity option).
+
+    Returns
+    -------
+    pd.DataFrame
+        Columns: strike, call_dollar_volume, put_dollar_volume, dollar_volume_pcr,
+        call_dollar_oi, put_dollar_oi, dollar_oi_pcr. One row per strike, sorted by
+        strike.
+    """
+    cols = [
+        "strike",
+        "call_dollar_volume",
+        "put_dollar_volume",
+        "dollar_volume_pcr",
+        "call_dollar_oi",
+        "put_dollar_oi",
+        "dollar_oi_pcr",
+    ]
+    if (
+        chain.empty
+        or "kind" not in chain.columns
+        or "open_interest" not in chain.columns
+        or "strike" not in chain.columns
+        or price_col not in chain.columns
+    ):
+        return pd.DataFrame(columns=cols)
+
+    df = chain.copy()
+    df["_kind"] = (
+        df["kind"].str.lower().map({"call": "call", "c": "call", "put": "put", "p": "put"})
+    )
+    df = df.dropna(subset=["_kind", "strike", "open_interest", price_col])
+    if df.empty:
+        return pd.DataFrame(columns=cols)
+
+    has_volume = "volume" in df.columns
+
+    rows = []
+    for strike, grp in df.groupby("strike", sort=True):
+        calls = grp[grp["_kind"] == "call"]
+        puts = grp[grp["_kind"] == "put"]
+        call_doi = float((calls[price_col] * calls["open_interest"]).sum()) * contract_size
+        put_doi = float((puts[price_col] * puts["open_interest"]).sum()) * contract_size
+        doi_pcr = put_doi / call_doi if call_doi > 0 else float("nan")
+
+        if has_volume:
+            call_dvol = float((calls[price_col] * calls["volume"]).sum(skipna=True)) * contract_size
+            put_dvol = float((puts[price_col] * puts["volume"]).sum(skipna=True)) * contract_size
+            dvol_pcr = put_dvol / call_dvol if call_dvol > 0 else float("nan")
+        else:
+            call_dvol = put_dvol = dvol_pcr = float("nan")
+
+        rows.append(
+            {
+                "strike": float(strike),
+                "call_dollar_volume": call_dvol,
+                "put_dollar_volume": put_dvol,
+                "dollar_volume_pcr": dvol_pcr,
+                "call_dollar_oi": call_doi,
+                "put_dollar_oi": put_doi,
+                "dollar_oi_pcr": doi_pcr,
+            }
+        )
+
+    return pd.DataFrame(rows, columns=cols)
+
+
 def oi_walls(chain: pd.DataFrame) -> pd.DataFrame:
     """Per-expiry call and put open-interest walls.
 

@@ -138,6 +138,11 @@ def dollar_volume(
     price_col: str = ...,
     contract_size: float = ...,
 ) -> pd.DataFrame: ...
+def dollar_volume_by_strike(
+    chain: pd.DataFrame,
+    price_col: str = ...,
+    contract_size: float = ...,
+) -> pd.DataFrame: ...
 def oi_walls(
     chain: pd.DataFrame,
 ) -> pd.DataFrame: ...

@@ -1132,6 +1132,111 @@ class TestDollarVolume:
         assert "dollar_volume_pcr" in out.columns
 
 
+class TestDollarVolumeByStrike:
+    def test_premium_weighted_per_strike(self):
+        chain = pd.DataFrame(
+            [
+                {
+                    "expiry": "2026-07-01",
+                    "strike": 100.0,
+                    "kind": "call",
+                    "mid": 2.0,
+                    "open_interest": 200,
+                    "volume": 100,
+                    "underlying_price": 100.0,
+                },
+                {
+                    "expiry": "2026-07-01",
+                    "strike": 100.0,
+                    "kind": "put",
+                    "mid": 4.0,
+                    "open_interest": 50,
+                    "volume": 75,
+                    "underlying_price": 100.0,
+                },
+            ]
+        )
+        r = oc.dollar_volume_by_strike(chain)
+        assert list(r["strike"]) == [100.0]
+        row = r.iloc[0]
+        # call: 2 * 100 * 100 = 20000, put: 4 * 75 * 100 = 30000
+        assert row["call_dollar_volume"] == pytest.approx(20000.0)
+        assert row["put_dollar_volume"] == pytest.approx(30000.0)
+        assert row["dollar_volume_pcr"] == pytest.approx(1.5)
+        assert row["call_dollar_oi"] == pytest.approx(40000.0)
+        assert row["put_dollar_oi"] == pytest.approx(20000.0)
+        assert row["dollar_oi_pcr"] == pytest.approx(0.5)
+
+    def test_collapses_expiries_into_one_strike_row(self):
+        chain = pd.DataFrame(
+            [
+                {
+                    "expiry": "2026-07-01",
+                    "strike": 100.0,
+                    "kind": "call",
+                    "mid": 2.0,
+                    "open_interest": 100,
+                    "volume": 10,
+                    "underlying_price": 100.0,
+                },
+                {
+                    "expiry": "2026-08-01",
+                    "strike": 100.0,
+                    "kind": "call",
+                    "mid": 3.0,
+                    "open_interest": 100,
+                    "volume": 10,
+                    "underlying_price": 100.0,
+                },
+            ]
+        )
+        r = oc.dollar_volume_by_strike(chain)
+        assert len(r) == 1
+        # both expiries fold in: (2+3) * 100 * 100
+        assert r.iloc[0]["call_dollar_oi"] == pytest.approx(50000.0)
+
+    def test_contract_size_scales(self):
+        chain = _synthetic_chain(expiry_days=(30,))
+        base = oc.dollar_volume_by_strike(chain).iloc[0]["call_dollar_oi"]
+        scaled = oc.dollar_volume_by_strike(chain, contract_size=50.0).iloc[0]["call_dollar_oi"]
+        assert scaled == pytest.approx(base / 2.0)
+
+    def test_missing_volume_column_gives_nan(self):
+        chain = _synthetic_chain(expiry_days=(30,)).drop(columns=["volume"])
+        r = oc.dollar_volume_by_strike(chain).iloc[0]
+        assert r["call_dollar_oi"] > 0
+        assert np.isnan(r["call_dollar_volume"])
+
+    def test_zero_call_side_gives_nan_pcr(self):
+        chain = pd.DataFrame(
+            [
+                {
+                    "expiry": "2026-07-01",
+                    "strike": 95.0,
+                    "kind": "put",
+                    "mid": 3.0,
+                    "open_interest": 50,
+                    "volume": 40,
+                    "underlying_price": 100.0,
+                },
+            ]
+        )
+        r = oc.dollar_volume_by_strike(chain).iloc[0]
+        assert r["put_dollar_oi"] == pytest.approx(15000.0)
+        assert np.isnan(r["dollar_oi_pcr"])
+
+    def test_one_row_per_strike_sorted(self):
+        out = oc.dollar_volume_by_strike(_synthetic_chain(expiry_days=(30,)))
+        assert list(out["strike"]) == sorted(out["strike"])
+        assert out["strike"].is_unique
+
+    def test_missing_price_column_returns_empty(self):
+        chain = _synthetic_chain(expiry_days=(30,)).drop(columns=["mid"])
+        out = oc.dollar_volume_by_strike(chain)
+        assert out.empty
+        assert "dollar_oi_pcr" in out.columns
+
+
 class TestLiquidity:
     def test_relative_spread_from_explicit_quotes(self):
         chain = pd.DataFrame(
