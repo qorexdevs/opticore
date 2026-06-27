@@ -8,6 +8,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- `pcr_by_strike()`: per-strike put/call ratio, the strike-level companion to `pcr()`.
+  Collapses the expiry axis instead of the strike axis, summing open interest and volume
+  per strike so you can see which strikes are put-heavy (downside hedging) versus call-heavy.
+  Same NaN rules as `pcr()`: the ratio is NaN when the call side is zero but the row is kept.
 - `butterfly()`: per-expiry butterfly spread cost, max profit/loss and the two breakevens,
   the range-bound, defined-risk sibling of `vertical()`. The body sits at the strike nearest
   spot and the wings `width` strikes either side; `side` is `long` (debit, profits if price

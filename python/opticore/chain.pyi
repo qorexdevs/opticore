@@ -114,6 +114,9 @@ def max_pain(
 def pcr(
     chain: pd.DataFrame,
 ) -> pd.DataFrame: ...
+def pcr_by_strike(
+    chain: pd.DataFrame,
+) -> pd.DataFrame: ...
 def turnover(
     chain: pd.DataFrame,
 ) -> pd.DataFrame: ...

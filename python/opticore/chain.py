@@ -1350,6 +1350,86 @@ def pcr(chain: pd.DataFrame) -> pd.DataFrame:
     return pd.DataFrame(rows, columns=cols)
 
 
+def pcr_by_strike(chain: pd.DataFrame) -> pd.DataFrame:
+    """Per-strike put/call ratio, the strike-level view behind ``pcr``.
+
+    ``pcr`` ratios puts against calls per expiry, which reads sentiment over time
+    but hides where on the board the positioning sits. This collapses the expiry
+    axis instead and keeps a row per strike, so you can see which strikes are
+    put-heavy (downside hedging or support) versus call-heavy (upside bets).
+
+    Same arithmetic and NaN rules as ``pcr``: ``open_interest`` is required,
+    ``volume`` optional. A ratio is NaN when the call side is zero (division by
+    zero) but the row is still emitted so the put total stays visible.
+
+    Parameters
+    ----------
+    chain : pd.DataFrame
+        Same schema as ``pcr``; needs ``open_interest``, ``strike`` and ``kind``.
+
+    Returns
+    -------
+    pd.DataFrame
+        Columns: strike, put_oi, call_oi, oi_pcr, put_volume, call_volume,
+        volume_pcr. One row per strike, sorted by strike.
+    """
+    cols = [
+        "strike",
+        "put_oi",
+        "call_oi",
+        "oi_pcr",
+        "put_volume",
+        "call_volume",
+        "volume_pcr",
+    ]
+    if (
+        chain.empty
+        or "kind" not in chain.columns
+        or "open_interest" not in chain.columns
+        or "strike" not in chain.columns
+    ):
+        return pd.DataFrame(columns=cols)
+
+    df = chain.copy()
+    df["_kind"] = (
+        df["kind"].str.lower().map({"call": "call", "c": "call", "put": "put", "p": "put"})
+    )
+    df = df.dropna(subset=["_kind", "strike", "open_interest"])
+    if df.empty:
+        return pd.DataFrame(columns=cols)
+
+    has_volume = "volume" in df.columns
+
+    rows = []
+    for strike, grp in df.groupby("strike", sort=True):
+        calls = grp[grp["_kind"] == "call"]
+        puts = grp[grp["_kind"] == "put"]
+        call_oi = float(calls["open_interest"].sum())
+        put_oi = float(puts["open_interest"].sum())
+        oi_pcr = put_oi / call_oi if call_oi > 0 else float("nan")
+
+        if has_volume:
+            call_vol = float(calls["volume"].sum(skipna=True))
+            put_vol = float(puts["volume"].sum(skipna=True))
+            volume_pcr = put_vol / call_vol if call_vol > 0 else float("nan")
+        else:
+            call_vol = put_vol = volume_pcr = float("nan")
+
+        rows.append(
+            {
+                "strike": float(strike),
+                "put_oi": put_oi,
+                "call_oi": call_oi,
+                "oi_pcr": oi_pcr,
+                "put_volume": put_vol,
+                "call_volume": call_vol,
+                "volume_pcr": volume_pcr,
+            }
+        )
+
+    return pd.DataFrame(rows, columns=cols)
+
+
 def turnover(chain: pd.DataFrame) -> pd.DataFrame:
     """Per-expiry volume-to-open-interest turnover, call and put side.
 

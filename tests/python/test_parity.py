@@ -803,6 +803,81 @@ class TestPCR:
         assert "oi_pcr" in out.columns
 
 
+class TestPCRByStrike:
+    def test_collapses_expiries_onto_each_strike(self):
+        # two expiries, same two strikes; per-strike OI sums across both
+        chain = _synthetic_chain(expiry_days=(30, 60))
+        out = oc.pcr_by_strike(chain)
+        per_strike = _synthetic_chain(expiry_days=(30,))
+        assert len(out) == per_strike["strike"].nunique()
+        assert list(out["strike"]) == sorted(out["strike"])
+
+    def test_more_puts_than_calls_at_a_strike(self):
+        chain = pd.DataFrame(
+            [
+                {
+                    "expiry": "2026-07-01",
+                    "strike": 90.0,
+                    "kind": "call",
+                    "open_interest": 50,
+                    "volume": 5,
+                    "underlying_price": 100.0,
+                },
+                {
+                    "expiry": "2026-08-01",
+                    "strike": 90.0,
+                    "kind": "put",
+                    "open_interest": 100,
+                    "volume": 30,
+                    "underlying_price": 100.0,
+                },
+                {
+                    "expiry": "2026-08-01",
+                    "strike": 90.0,
+                    "kind": "put",
+                    "open_interest": 50,
+                    "volume": 10,
+                    "underlying_price": 100.0,
+                },
+            ]
+        )
+        r = oc.pcr_by_strike(chain).iloc[0]
+        assert r["strike"] == pytest.approx(90.0)
+        assert r["put_oi"] == pytest.approx(150.0)
+        assert r["call_oi"] == pytest.approx(50.0)
+        assert r["oi_pcr"] == pytest.approx(3.0)
+        assert r["volume_pcr"] == pytest.approx(8.0)
+
+    def test_zero_call_oi_gives_nan_ratio(self):
+        chain = pd.DataFrame(
+            [
+                {
+                    "expiry": "2026-07-01",
+                    "strike": 80.0,
+                    "kind": "put",
+                    "open_interest": 200,
+                    "volume": 5,
+                    "underlying_price": 100.0,
+                },
+            ]
+        )
+        r = oc.pcr_by_strike(chain).iloc[0]
+        assert r["put_oi"] == pytest.approx(200.0)
+        assert np.isnan(r["oi_pcr"])
+
+    def test_missing_volume_column_keeps_oi_ratio(self):
+        chain = _synthetic_chain(expiry_days=(30,)).drop(columns=["volume"])
+        out = oc.pcr_by_strike(chain)
+        assert list(out["oi_pcr"]) == pytest.approx([1.0] * len(out))
+        assert out["volume_pcr"].isna().all()
+
+    def test_no_open_interest_column_returns_empty(self):
+        chain = _synthetic_chain(expiry_days=(30,)).drop(columns=["open_interest"])
+        out = oc.pcr_by_strike(chain)
+        assert out.empty
+        assert "oi_pcr" in out.columns
+
+
 class TestTurnover:
     def test_volume_over_oi_each_side(self):
         chain = pd.DataFrame(
