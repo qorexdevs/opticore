@@ -769,9 +769,7 @@ class TestCollar:
     def test_floor_and_cap_span_the_strikes(self):
         # cap less floor is exactly the strike band, premium drops out
         r = oc.collar(_synthetic_chain(underlying=100.0, expiry_days=(30,))).iloc[0]
-        assert r["max_profit"] - r["max_loss"] == pytest.approx(
-            r["call_strike"] - r["put_strike"]
-        )
+        assert r["max_profit"] - r["max_loss"] == pytest.approx(r["call_strike"] - r["put_strike"])
         assert r["max_profit"] == pytest.approx(r["call_strike"] - r["breakeven"])
         assert r["max_loss"] == pytest.approx(r["put_strike"] - r["breakeven"])
 
