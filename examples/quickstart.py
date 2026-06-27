@@ -44,12 +44,23 @@ def strategy():
           f"{[round(b, 1) for b in p.breakevens]}")
 
 
+def positioning():
+    chain = oc.fetch_chain(provider="sample", symbol="SPY")
+    enriched = oc.enrich(chain, rate=0.045, div_yield=0.013)
+    gex = oc.gamma_exposure(enriched)
+    r = gex.iloc[0]
+    lean = "dampening" if r["net_gex"] > 0 else "amplifying"
+    print(f"gamma exposure  net {r['net_gex']:.3e} ({lean}), "
+          f"wall at strike {r['gamma_wall_strike']:.0f}")
+
+
 if __name__ == "__main__":
     for name, fn in [
         ("scalar pricing / iv / greeks", scalars),
         ("vectorized over a strike range", vectorized),
         ("sample chain enrichment", sample_chain),
         ("strategy payoff as numbers", strategy),
+        ("dealer gamma exposure", positioning),
     ]:
         print(f"\n# {name}")
         fn()
