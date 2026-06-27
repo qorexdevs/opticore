@@ -126,6 +126,34 @@ oc.plot.term_structure(enriched)
 oc.plot.liquidity(enriched)
 ```
 
+## Positioning & flow analytics
+
+Beyond pricing, OptiCore reads the chain itself - where open interest piles up,
+which strikes are churning, and how the put/call balance leans. These are pure
+summations over `open_interest`/`volume`, no IV solve, so they run on a raw chain
+straight from any provider:
+
+```python
+chain = oc.fetch_chain(provider="sample", symbol="SPY")
+
+# Strike that minimizes total option-holder payout, per expiry
+oc.max_pain(chain)        # => expiry, max_pain_strike, total_oi, pain_at_max_pain
+
+# Put/call ratios by open interest, volume, and dollar terms
+oc.pcr(chain)             # => oi_pcr, volume_pcr per expiry
+oc.dollar_volume(chain)   # => premium turnover, dollar_volume_pcr per expiry
+
+# Where the open interest concentrates - the strikes that act as walls
+oc.oi_walls(chain)        # => call_wall, put_wall and their OI per expiry
+
+# Day's volume against standing OI - flags fresh positioning vs old carry
+oc.turnover(chain)        # => call/put turnover per expiry
+```
+
+Each has a `*_by_strike` companion (`pcr_by_strike`, `turnover_by_strike`,
+`oi_profile`, `volume_profile`, ...) that collapses the expiry axis and keeps a
+row per strike when you want the strike map instead of the per-expiry summary.
+
 ## Installation Options
 
 ```bash
