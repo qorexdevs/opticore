@@ -670,6 +670,94 @@ class TestButterfly:
         assert "net_debit" in out.columns
 
 
+class TestIronCondor:
+    def test_legs_bracket_spot(self):
+        # strikes step 3 (85..115), spot 100, gap 1, width 1
+        out = oc.iron_condor(_synthetic_chain(underlying=100.0, expiry_days=(30,)))
+        r = out.iloc[0]
+        assert r["put_long_strike"] == 94.0
+        assert r["put_short_strike"] == 97.0
+        assert r["call_short_strike"] == 103.0
+        assert r["call_long_strike"] == 106.0
+
+    def test_short_is_credit_with_capped_loss(self):
+        chain = _synthetic_chain(underlying=100.0, expiry_days=(30,))
+        r = oc.iron_condor(chain).iloc[0]
+        credit = -r["net_debit"]
+        assert r["net_debit"] < 0  # collect to open
+        assert r["max_profit"] == pytest.approx(credit)
+        # loss is capped at the wing width (3) less the credit kept
+        assert r["max_loss"] == pytest.approx(credit - 3.0)
+
+    def test_breakevens_sit_credit_off_the_shorts(self):
+        chain = _synthetic_chain(underlying=100.0, expiry_days=(30,))
+        r = oc.iron_condor(chain).iloc[0]
+        credit = -r["net_debit"]
+        assert r["breakeven_low"] == pytest.approx(97.0 - credit)
+        assert r["breakeven_high"] == pytest.approx(103.0 + credit)
+
+    def test_long_is_debit_mirror_of_short(self):
+        chain = _synthetic_chain(underlying=100.0, expiry_days=(30,))
+        sht = oc.iron_condor(chain, side="short").iloc[0]
+        lng = oc.iron_condor(chain, side="long").iloc[0]
+        assert lng["net_debit"] == pytest.approx(-sht["net_debit"])
+        assert lng["max_profit"] == pytest.approx(-sht["max_loss"])
+        assert lng["max_loss"] == pytest.approx(-sht["max_profit"])
+
+    def test_wider_wings_risk_more(self):
+        chain = _synthetic_chain(underlying=100.0, expiry_days=(30,))
+        w1 = oc.iron_condor(chain, width=1).iloc[0]
+        w2 = oc.iron_condor(chain, width=2).iloc[0]
+        assert w2["put_long_strike"] == 91.0
+        assert w2["call_long_strike"] == 109.0
+        # same shorts, wings further out -> more credit but a deeper max loss
+        assert w2["max_loss"] < w1["max_loss"]
+
+    def test_gap_pushes_shorts_out(self):
+        chain = _synthetic_chain(underlying=100.0, expiry_days=(30,))
+        r = oc.iron_condor(chain, gap=2).iloc[0]
+        assert r["put_short_strike"] == 94.0
+        assert r["call_short_strike"] == 106.0
+
+    def test_one_row_per_expiry_sorted(self):
+        out = oc.iron_condor(_synthetic_chain(expiry_days=(120, 30, 60)))
+        assert len(out) == 3
+        assert list(out["tte"]) == sorted(out["tte"])
+
+    def test_returns_expected_columns(self):
+        out = oc.iron_condor(_synthetic_chain())
+        for col in (
+            "expiry",
+            "tte",
+            "side",
+            "put_long_strike",
+            "put_short_strike",
+            "call_short_strike",
+            "call_long_strike",
+            "underlying_price",
+            "net_debit",
+            "max_profit",
+            "max_loss",
+            "breakeven_low",
+            "breakeven_high",
+        ):
+            assert col in out.columns
+
+    def test_bad_args_raise(self):
+        with pytest.raises(ValueError):
+            oc.iron_condor(_synthetic_chain(), gap=0)
+        with pytest.raises(ValueError):
+            oc.iron_condor(_synthetic_chain(), width=0)
+        with pytest.raises(ValueError):
+            oc.iron_condor(_synthetic_chain(), side="flat")
+
+    def test_empty_chain_returns_empty_frame(self):
+        empty = pd.DataFrame(columns=["expiry", "strike", "kind", "underlying_price", "mid"])
+        out = oc.iron_condor(empty)
+        assert out.empty
+        assert "net_debit" in out.columns
+
+
 class TestMaxPain:
     def test_symmetric_uniform_oi_pins_center(self):
         # 85..115 strikes, equal OI everywhere, spot 100 -> center strike wins

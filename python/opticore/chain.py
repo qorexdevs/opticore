@@ -1191,6 +1191,146 @@ def butterfly(
     return pd.DataFrame(rows, columns=cols)
 
 
+def iron_condor(
+    chain: pd.DataFrame,
+    side: str = "short",
+    gap: int = 1,
+    width: int = 1,
+    price_col: str = "mid",
+) -> pd.DataFrame:
+    """Per-expiry iron condor cost, max profit/loss and breakevens.
+
+    An iron condor is two out-of-the-money credit spreads, one in puts below
+    spot and one in calls above it, sharing the same expiry. The short strikes
+    sit ``gap`` strikes either side of the strike nearest spot and the long
+    wings ``width`` strikes further out, so the payoff is a flat plateau between
+    the shorts that tapers to a capped loss past either wing.
+
+    ``side='short'`` is the textbook condor: it collects a credit
+    (``net_debit < 0``) and profits while price stays inside the short strikes.
+    ``side='long'`` flips every leg, pays a debit (``net_debit > 0``) and profits
+    on a move past either wing. Max profit, max loss and the two breakevens are
+    read straight off the expiry payoff - flat between the shorts, linear across
+    the wings - so no IV solve is needed. Only strikes quoting both a call and a
+    put are used; an expiry is dropped when a wing runs past the listed strikes.
+
+    Parameters
+    ----------
+    chain : pd.DataFrame
+        Same schema as ``straddle`` / ``butterfly``.
+    side : str
+        ``'short'`` (credit, default) or ``'long'`` (debit).
+    gap : int
+        How many strikes each short leg sits from the body (default: 1). >= 1.
+    width : int
+        How many strikes each long wing sits past its short (default: 1). >= 1.
+    price_col : str
+        Which price to use (default: 'mid').
+
+    Returns
+    -------
+    pd.DataFrame
+        Columns: expiry, tte, side, put_long_strike, put_short_strike,
+        call_short_strike, call_long_strike, underlying_price, net_debit,
+        max_profit, max_loss, breakeven_low, breakeven_high. One row per expiry,
+        sorted by expiry. ``net_debit`` is negative for a short (credit) condor
+        and positive for a long (debit); ``max_loss`` is negative.
+    """
+    if gap < 1:
+        raise ValueError("gap must be >= 1")
+    if width < 1:
+        raise ValueError("width must be >= 1")
+    side = side.lower()
+    if side not in ("long", "short"):
+        raise ValueError("side must be 'long' or 'short'")
+    cols = [
+        "expiry",
+        "tte",
+        "side",
+        "put_long_strike",
+        "put_short_strike",
+        "call_short_strike",
+        "call_long_strike",
+        "underlying_price",
+        "net_debit",
+        "max_profit",
+        "max_loss",
+        "breakeven_low",
+        "breakeven_high",
+    ]
+    p = _pivot_call_put(chain, price_col)
+    if p.empty:
+        return pd.DataFrame(columns=cols)
+
+    now = datetime.now(timezone.utc)
+    expiry_dt = pd.to_datetime(p["expiry"], utc=True)
+    p = p.assign(_tte=(expiry_dt - now).dt.total_seconds() / (365.25 * 24 * 3600))
+
+    sign = 1.0 if side == "long" else -1.0
+
+    rows = []
+    for exp, grp in p.groupby("expiry", sort=True):
+        grp = grp.sort_values("strike").reset_index(drop=True)
+        spot = float(grp["underlying_price"].iloc[0])
+        c_idx = int((grp["strike"] - spot).abs().idxmin())
+        lp_idx = c_idx - gap - width
+        sp_idx = c_idx - gap
+        sc_idx = c_idx + gap
+        lc_idx = c_idx + gap + width
+        if lp_idx < 0 or lc_idx >= len(grp):
+            continue
+
+        k_lp = float(grp["strike"].iloc[lp_idx])
+        k_sp = float(grp["strike"].iloc[sp_idx])
+        k_sc = float(grp["strike"].iloc[sc_idx])
+        k_lc = float(grp["strike"].iloc[lc_idx])
+        prem_lp = float(grp["put_mid"].iloc[lp_idx])
+        prem_sp = float(grp["put_mid"].iloc[sp_idx])
+        prem_sc = float(grp["call_mid"].iloc[sc_idx])
+        prem_lc = float(grp["call_mid"].iloc[lc_idx])
+
+        # sell the inner strikes, buy the wings -> usually a net credit
+        credit = (prem_sp - prem_lp) + (prem_sc - prem_lc)
+        net_cost = sign * credit
+
+        def _pnl(s: float) -> float:
+            put_spread = max(k_sp - s, 0.0) - max(k_lp - s, 0.0)
+            call_spread = max(s - k_sc, 0.0) - max(s - k_lc, 0.0)
+            return sign * (put_spread + call_spread - credit)
+
+        pnls = [_pnl(k) for k in (k_lp, k_sp, k_sc, k_lc)]
+        max_profit = max(pnls)
+        max_loss = min(pnls)
+
+        def _cross(ka: float, pa: float, kb: float, pb: float) -> float:
+            if pa == pb or (pa > 0) == (pb > 0):
+                return float("nan")
+            return ka + (0.0 - pa) * (kb - ka) / (pb - pa)
+
+        be_low = _cross(k_lp, pnls[0], k_sp, pnls[1])
+        be_high = _cross(k_sc, pnls[2], k_lc, pnls[3])
+
+        rows.append(
+            {
+                "expiry": exp,
+                "tte": float(grp["_tte"].iloc[c_idx]),
+                "side": side,
+                "put_long_strike": k_lp,
+                "put_short_strike": k_sp,
+                "call_short_strike": k_sc,
+                "call_long_strike": k_lc,
+                "underlying_price": spot,
+                "net_debit": net_cost,
+                "max_profit": max_profit,
+                "max_loss": max_loss,
+                "breakeven_low": be_low,
+                "breakeven_high": be_high,
+            }
+        )
+
+    return pd.DataFrame(rows, columns=cols)
+
+
 def max_pain(chain: pd.DataFrame) -> pd.DataFrame:
     """Per-expiry max-pain strike from open interest.
 

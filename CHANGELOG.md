@@ -8,6 +8,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- `iron_condor()`: per-expiry iron condor cost, max profit/loss and the two breakevens,
+  built from two out-of-the-money credit spreads (puts below spot, calls above). The short
+  legs sit `gap` strikes either side of spot and the long wings `width` further out; `side`
+  is `short` (credit, profits inside the shorts) or `long` (debit, profits past a wing).
+  Metrics read straight off the expiry payoff, no IV solve.
 - `pcr_by_strike()`: per-strike put/call ratio, the strike-level companion to `pcr()`.
   Collapses the expiry axis instead of the strike axis, summing open interest and volume
   per strike so you can see which strikes are put-heavy (downside hedging) versus call-heavy.

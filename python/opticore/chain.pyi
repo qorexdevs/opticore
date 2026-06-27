@@ -108,6 +108,13 @@ def butterfly(
     width: int = ...,
     price_col: str = ...,
 ) -> pd.DataFrame: ...
+def iron_condor(
+    chain: pd.DataFrame,
+    side: str = ...,
+    gap: int = ...,
+    width: int = ...,
+    price_col: str = ...,
+) -> pd.DataFrame: ...
 def max_pain(
     chain: pd.DataFrame,
 ) -> pd.DataFrame: ...
