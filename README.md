@@ -70,6 +70,13 @@ enriched = oc.enrich(chain, rate=0.045, div_yield=0.013)
 oc.plot.smile(enriched)
 ```
 
+[`examples/quickstart.py`](examples/quickstart.py) runs the whole offline path
+(pricing, IV, Greeks, chain enrichment, a strategy payoff) end to end:
+
+```bash
+python examples/quickstart.py
+```
+
 For ~15-min delayed real data without an IBKR account:
 
 ```python

@@ -8,6 +8,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- `examples/quickstart.py`: a runnable script that walks the whole offline path - scalar
+  and vectorized pricing, IV round-trip, Greeks, sample-chain enrichment and a strategy
+  payoff - printing numbers instead of plotting, so `python examples/quickstart.py` works
+  with no account, network or matplotlib.
 - `notebooks/06_positioning_flow.ipynb`: positioning and flow walkthrough on the bundled
   sample chain - OI walls, max pain, OI vs volume put/call ratio, turnover and dollar
   volume, and when the `*_by_strike` view beats the per-expiry summary. Offline,
