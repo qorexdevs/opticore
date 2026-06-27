@@ -8,6 +8,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- `turnover_by_strike()`: per-strike volume-to-open-interest turnover, the strike-level
+  companion to `turnover()`. Collapses the expiry axis and keeps a row per strike, so a
+  strike where today's volume rivals its standing book stands out as where fresh money is
+  working. Same NaN rules as `turnover()`: turnover is NaN when a side has no open interest.
 - `dollar_volume_by_strike()`: per-strike premium in dollars, the strike-level companion to
   `dollar_volume()`. Collapses the expiry axis and keeps a row per strike, so a few deep ITM
   strikes that dominate the dollar book but barely register in the contract count show up.

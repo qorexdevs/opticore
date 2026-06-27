@@ -127,6 +127,9 @@ def pcr_by_strike(
 def turnover(
     chain: pd.DataFrame,
 ) -> pd.DataFrame: ...
+def turnover_by_strike(
+    chain: pd.DataFrame,
+) -> pd.DataFrame: ...
 def liquidity(
     chain: pd.DataFrame,
 ) -> pd.DataFrame: ...

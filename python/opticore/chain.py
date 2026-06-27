@@ -1649,6 +1649,91 @@ def turnover(chain: pd.DataFrame) -> pd.DataFrame:
     return pd.DataFrame(rows, columns=cols)
 
 
+def turnover_by_strike(chain: pd.DataFrame) -> pd.DataFrame:
+    """Per-strike volume-to-open-interest turnover, the strike view behind ``turnover``.
+
+    ``turnover`` ratios the day's volume against standing open interest per expiry,
+    which reads fresh positioning over time but hides which strikes are churning.
+    This collapses the expiry axis and keeps a row per strike, so a strike where
+    today's volume rivals its open book stands out as where new money is working,
+    versus strikes carrying an old, quiet position. Reported per side since calls
+    and puts often turn over at very different rates.
+
+    Same arithmetic and NaN rules as ``turnover``: ``open_interest`` is required,
+    ``volume`` optional and the turnover is NaN when missing. A ratio is NaN when a
+    side has no open interest at that strike, but the row is still emitted so the
+    volume stays visible.
+
+    Parameters
+    ----------
+    chain : pd.DataFrame
+        Same schema as ``pcr_by_strike``; needs ``open_interest``, ``strike`` and
+        ``kind``.
+
+    Returns
+    -------
+    pd.DataFrame
+        Columns: strike, call_volume, call_oi, call_turnover, put_volume, put_oi,
+        put_turnover. One row per strike, sorted by strike.
+    """
+    cols = [
+        "strike",
+        "call_volume",
+        "call_oi",
+        "call_turnover",
+        "put_volume",
+        "put_oi",
+        "put_turnover",
+    ]
+    if (
+        chain.empty
+        or "kind" not in chain.columns
+        or "open_interest" not in chain.columns
+        or "strike" not in chain.columns
+    ):
+        return pd.DataFrame(columns=cols)
+
+    df = chain.copy()
+    df["_kind"] = (
+        df["kind"].str.lower().map({"call": "call", "c": "call", "put": "put", "p": "put"})
+    )
+    df = df.dropna(subset=["_kind", "strike", "open_interest"])
+    if df.empty:
+        return pd.DataFrame(columns=cols)
+
+    has_volume = "volume" in df.columns
+
+    rows = []
+    for strike, grp in df.groupby("strike", sort=True):
+        calls = grp[grp["_kind"] == "call"]
+        puts = grp[grp["_kind"] == "put"]
+        call_oi = float(calls["open_interest"].sum())
+        put_oi = float(puts["open_interest"].sum())
+
+        if has_volume:
+            call_vol = float(calls["volume"].sum(skipna=True))
+            put_vol = float(puts["volume"].sum(skipna=True))
+        else:
+            call_vol = put_vol = float("nan")
+
+        call_turnover = call_vol / call_oi if call_oi > 0 else float("nan")
+        put_turnover = put_vol / put_oi if put_oi > 0 else float("nan")
+
+        rows.append(
+            {
+                "strike": float(strike),
+                "call_volume": call_vol,
+                "call_oi": call_oi,
+                "call_turnover": call_turnover,
+                "put_volume": put_vol,
+                "put_oi": put_oi,
+                "put_turnover": put_turnover,
+            }
+        )
+
+    return pd.DataFrame(rows, columns=cols)
+
+
 def liquidity(chain: pd.DataFrame) -> pd.DataFrame:
     """Per-expiry bid-ask spread, a liquidity gauge for picking tradeable strikes.
 

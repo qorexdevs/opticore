@@ -1027,6 +1027,79 @@ class TestTurnover:
         assert "call_turnover" in out.columns
 
 
+class TestTurnoverByStrike:
+    def test_collapses_expiries_onto_each_strike(self):
+        chain = _synthetic_chain(expiry_days=(30, 60))
+        out = oc.turnover_by_strike(chain)
+        per_strike = _synthetic_chain(expiry_days=(30,))
+        assert len(out) == per_strike["strike"].nunique()
+        assert list(out["strike"]) == sorted(out["strike"])
+
+    def test_volume_over_oi_each_side_at_strike(self):
+        chain = pd.DataFrame(
+            [
+                {
+                    "expiry": "2026-07-01",
+                    "strike": 100.0,
+                    "kind": "call",
+                    "open_interest": 200,
+                    "volume": 100,
+                    "underlying_price": 100.0,
+                },
+                {
+                    "expiry": "2026-08-01",
+                    "strike": 100.0,
+                    "kind": "put",
+                    "open_interest": 30,
+                    "volume": 30,
+                    "underlying_price": 100.0,
+                },
+                {
+                    "expiry": "2026-08-01",
+                    "strike": 100.0,
+                    "kind": "put",
+                    "open_interest": 20,
+                    "volume": 45,
+                    "underlying_price": 100.0,
+                },
+            ]
+        )
+        r = oc.turnover_by_strike(chain).iloc[0]
+        assert r["strike"] == pytest.approx(100.0)
+        assert r["call_turnover"] == pytest.approx(0.5)
+        assert r["put_oi"] == pytest.approx(50.0)
+        assert r["put_turnover"] == pytest.approx(1.5)
+
+    def test_zero_oi_gives_nan_turnover(self):
+        chain = pd.DataFrame(
+            [
+                {
+                    "expiry": "2026-07-01",
+                    "strike": 80.0,
+                    "kind": "call",
+                    "open_interest": 0,
+                    "volume": 30,
+                    "underlying_price": 100.0,
+                },
+            ]
+        )
+        r = oc.turnover_by_strike(chain).iloc[0]
+        assert r["call_volume"] == pytest.approx(30.0)
+        assert np.isnan(r["call_turnover"])
+
+    def test_missing_volume_column_gives_nan(self):
+        chain = _synthetic_chain(expiry_days=(30,)).drop(columns=["volume"])
+        out = oc.turnover_by_strike(chain)
+        assert (out["call_oi"] > 0).any()
+        assert out["call_turnover"].isna().all()
+
+    def test_no_open_interest_column_returns_empty(self):
+        chain = _synthetic_chain(expiry_days=(30,)).drop(columns=["open_interest"])
+        out = oc.turnover_by_strike(chain)
+        assert out.empty
+        assert "call_turnover" in out.columns
+
+
 class TestDollarVolume:
     def test_premium_weighted_each_side(self):
         chain = pd.DataFrame(
