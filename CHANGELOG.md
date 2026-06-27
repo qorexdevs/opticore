@@ -8,6 +8,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- `collar()`: per-expiry collar on a held long position - buys a protective put `gap` strikes
+  below spot and sells a covered call `gap` above it, reporting `net_debit` (put paid less call
+  collected, near zero for a zero-cost collar), the floored `max_loss`, capped `max_profit` and
+  the single breakeven. Read straight off the expiry payoff, no IV solve, the strategy-family
+  companion to `iron_condor` that carries the underlying instead of being all options.
 - `examples/quickstart.py`: a runnable script that walks the whole offline path - scalar
   and vectorized pricing, IV round-trip, Greeks, sample-chain enrichment and a strategy
   payoff - printing numbers instead of plotting, so `python examples/quickstart.py` works

@@ -115,6 +115,11 @@ def iron_condor(
     width: int = ...,
     price_col: str = ...,
 ) -> pd.DataFrame: ...
+def collar(
+    chain: pd.DataFrame,
+    gap: int = ...,
+    price_col: str = ...,
+) -> pd.DataFrame: ...
 def max_pain(
     chain: pd.DataFrame,
 ) -> pd.DataFrame: ...

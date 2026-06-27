@@ -758,6 +758,70 @@ class TestIronCondor:
         assert "net_debit" in out.columns
 
 
+class TestCollar:
+    def test_legs_bracket_spot(self):
+        # strikes step 3 (85..115), spot 100, gap 1
+        r = oc.collar(_synthetic_chain(underlying=100.0, expiry_days=(30,))).iloc[0]
+        assert r["put_strike"] == 97.0
+        assert r["call_strike"] == 103.0
+        assert r["underlying_price"] == 100.0
+
+    def test_floor_and_cap_span_the_strikes(self):
+        # cap less floor is exactly the strike band, premium drops out
+        r = oc.collar(_synthetic_chain(underlying=100.0, expiry_days=(30,))).iloc[0]
+        assert r["max_profit"] - r["max_loss"] == pytest.approx(
+            r["call_strike"] - r["put_strike"]
+        )
+        assert r["max_profit"] == pytest.approx(r["call_strike"] - r["breakeven"])
+        assert r["max_loss"] == pytest.approx(r["put_strike"] - r["breakeven"])
+
+    def test_breakeven_is_spot_plus_net(self):
+        r = oc.collar(_synthetic_chain(underlying=100.0, expiry_days=(30,))).iloc[0]
+        assert r["breakeven"] == pytest.approx(r["underlying_price"] + r["net_debit"])
+
+    def test_positive_carry_is_a_small_credit(self):
+        # forward sits above spot under positive rates, so the cap call is dearer
+        # than the equidistant floor put -> a credit and a breakeven below spot
+        r = oc.collar(_synthetic_chain(underlying=100.0, rate=0.05, expiry_days=(30,))).iloc[0]
+        assert r["net_debit"] < 0
+        assert r["breakeven"] < 100.0
+
+    def test_gap_pushes_legs_out(self):
+        r = oc.collar(_synthetic_chain(underlying=100.0, expiry_days=(30,)), gap=2).iloc[0]
+        assert r["put_strike"] == 94.0
+        assert r["call_strike"] == 106.0
+
+    def test_one_row_per_expiry_sorted(self):
+        out = oc.collar(_synthetic_chain(expiry_days=(120, 30, 60)))
+        assert len(out) == 3
+        assert list(out["tte"]) == sorted(out["tte"])
+
+    def test_returns_expected_columns(self):
+        out = oc.collar(_synthetic_chain())
+        for col in (
+            "expiry",
+            "tte",
+            "put_strike",
+            "call_strike",
+            "underlying_price",
+            "net_debit",
+            "max_profit",
+            "max_loss",
+            "breakeven",
+        ):
+            assert col in out.columns
+
+    def test_bad_gap_raises(self):
+        with pytest.raises(ValueError):
+            oc.collar(_synthetic_chain(), gap=0)
+
+    def test_empty_chain_returns_empty_frame(self):
+        empty = pd.DataFrame(columns=["expiry", "strike", "kind", "underlying_price", "mid"])
+        out = oc.collar(empty)
+        assert out.empty
+        assert "net_debit" in out.columns
+
+
 class TestMaxPain:
     def test_symmetric_uniform_oi_pins_center(self):
         # 85..115 strikes, equal OI everywhere, spot 100 -> center strike wins

@@ -1331,6 +1331,99 @@ def iron_condor(
     return pd.DataFrame(rows, columns=cols)
 
 
+def collar(
+    chain: pd.DataFrame,
+    gap: int = 1,
+    price_col: str = "mid",
+) -> pd.DataFrame:
+    """Per-expiry collar on a long underlying position: floor, cap and net cost.
+
+    A collar protects a held long position by buying an out-of-the-money put
+    ``gap`` strikes below spot (a floor) and selling an out-of-the-money call
+    ``gap`` strikes above it (a cap), paying for the put with the call premium.
+    Unlike the pure-option spreads here it carries the underlying, so its payoff
+    is measured against entry at spot: below the put strike the loss is floored,
+    above the call strike the gain is capped, and in between it tracks the stock
+    one for one.
+
+    ``net_debit`` is the put premium paid minus the call premium collected, so a
+    zero-cost collar sits near 0 and a credit collar goes negative. Max profit
+    (``call_strike - spot - net_debit``), max loss (``put_strike - spot -
+    net_debit``) and the single breakeven (``spot + net_debit``) read straight
+    off the expiry payoff - no IV solve. Only strikes quoting both a call and a
+    put count, and an expiry is dropped when it has no strike ``gap`` steps out
+    on either side.
+
+    Parameters
+    ----------
+    chain : pd.DataFrame
+        Same schema as ``straddle`` / ``iron_condor``.
+    gap : int
+        How many strikes each leg sits from spot (default: 1). Must be >= 1.
+    price_col : str
+        Which price to use (default: 'mid').
+
+    Returns
+    -------
+    pd.DataFrame
+        Columns: expiry, tte, put_strike, call_strike, underlying_price,
+        net_debit, max_profit, max_loss, breakeven. One row per expiry, sorted by
+        expiry. ``max_loss`` is negative once the floor sits below entry.
+    """
+    if gap < 1:
+        raise ValueError("gap must be >= 1")
+    cols = [
+        "expiry",
+        "tte",
+        "put_strike",
+        "call_strike",
+        "underlying_price",
+        "net_debit",
+        "max_profit",
+        "max_loss",
+        "breakeven",
+    ]
+    p = _pivot_call_put(chain, price_col)
+    if p.empty:
+        return pd.DataFrame(columns=cols)
+
+    now = datetime.now(timezone.utc)
+    expiry_dt = pd.to_datetime(p["expiry"], utc=True)
+    p = p.assign(_tte=(expiry_dt - now).dt.total_seconds() / (365.25 * 24 * 3600))
+
+    rows = []
+    for exp, grp in p.groupby("expiry", sort=True):
+        grp = grp.sort_values("strike").reset_index(drop=True)
+        spot = float(grp["underlying_price"].iloc[0])
+        c_idx = int((grp["strike"] - spot).abs().idxmin())
+        p_idx = c_idx - gap
+        call_idx = c_idx + gap
+        if p_idx < 0 or call_idx >= len(grp):
+            continue
+
+        k_put = float(grp["strike"].iloc[p_idx])
+        k_call = float(grp["strike"].iloc[call_idx])
+        prem_put = float(grp["put_mid"].iloc[p_idx])
+        prem_call = float(grp["call_mid"].iloc[call_idx])
+        net_cost = prem_put - prem_call
+
+        rows.append(
+            {
+                "expiry": exp,
+                "tte": float(grp["_tte"].iloc[c_idx]),
+                "put_strike": k_put,
+                "call_strike": k_call,
+                "underlying_price": spot,
+                "net_debit": net_cost,
+                "max_profit": k_call - spot - net_cost,
+                "max_loss": k_put - spot - net_cost,
+                "breakeven": spot + net_cost,
+            }
+        )
+
+    return pd.DataFrame(rows, columns=cols)
+
+
 def max_pain(chain: pd.DataFrame) -> pd.DataFrame:
     """Per-expiry max-pain strike from open interest.
 
