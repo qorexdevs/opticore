@@ -8,6 +8,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- `notebooks/06_positioning_flow.ipynb`: positioning and flow walkthrough on the bundled
+  sample chain - OI walls, max pain, OI vs volume put/call ratio, turnover and dollar
+  volume, and when the `*_by_strike` view beats the per-expiry summary. Offline,
+  `provider="sample"`, reads each output rather than just printing it.
 - `turnover_by_strike()`: per-strike volume-to-open-interest turnover, the strike-level
   companion to `turnover()`. Collapses the expiry axis and keeps a row per strike, so a
   strike where today's volume rivals its standing book stands out as where fresh money is
