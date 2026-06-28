@@ -8,10 +8,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Fixed
-- `enrich()`: parse string `expiry` values with explicit formats (`YYYYMMDD` then
-  ISO 8601) instead of letting `pd.to_datetime` guess. The guesser's strptime fallback
-  segfaulted in the manylinux wheel test, which broke the release build. Unparseable
-  values now raise a clear `ValueError`.
+- `enrich()`: parse `expiry` through numpy's `datetime64` reader instead of
+  `pd.to_datetime`. The pandas strptime path segfaulted inside the manylinux wheel
+  test and broke the release build; numpy's C ISO parser is independent of it.
+  `YYYYMMDD` and ISO 8601 strings both work, unparseable values raise a clear
+  `ValueError`. Also dropped the `numpy<2.5` pin from the wheel test env, which had
+  pulled in an ABI-mismatched numpy and started crashing the Windows wheels too.
 
 ## [0.4.0] - 2026-06-28
 

@@ -182,22 +182,28 @@ def enrich(
 
     # ── Time to expiry in years ──────────────────────────────────────────
     # Accept either pd.Timestamp (current schema) or "YYYYMMDD" / ISO strings.
-    # We parse strings with explicit formats instead of letting to_datetime
-    # guess: the guesser routes through a strptime fallback that segfaults on
-    # some manylinux pandas builds when handed bare "YYYYMMDD" values.
+    # Parse via numpy's own datetime64 reader, not pandas to_datetime: the
+    # pandas tslibs strptime path segfaults inside the manylinux test image,
+    # while numpy's C ISO parser is independent of it.
     now = datetime.now(timezone.utc)
     expiry = df["expiry"]
     if pd.api.types.is_datetime64_any_dtype(expiry):
-        expiry_dt = pd.to_datetime(expiry, utc=True)
+        idx = pd.DatetimeIndex(expiry)
+        if idx.tz is not None:
+            idx = idx.tz_convert("UTC").tz_localize(None)
+        expiry64 = idx.to_numpy(dtype="datetime64[s]")
     else:
+        # Normalize "YYYYMMDD" to "YYYY-MM-DD"; ISO strings already match and
+        # are left untouched, then numpy parses both.
         s = expiry.astype(str).str.strip()
-        expiry_dt = pd.to_datetime(s, format="%Y%m%d", utc=True, errors="coerce")
-        if expiry_dt.isna().any():
-            iso = pd.to_datetime(s, format="ISO8601", utc=True, errors="coerce")
-            expiry_dt = expiry_dt.fillna(iso)
-        if expiry_dt.isna().any():
-            raise ValueError("expiry must be a Timestamp, 'YYYYMMDD', or ISO date string")
-    df["tte"] = (expiry_dt - now).dt.total_seconds() / (365.25 * 24 * 3600)
+        iso = s.str.replace(r"^(\d{4})(\d{2})(\d{2})$", r"\1-\2-\3", regex=True)
+        try:
+            expiry64 = np.asarray(iso.to_numpy(), dtype="datetime64[s]")
+        except (ValueError, TypeError) as e:
+            raise ValueError("expiry must be a Timestamp, 'YYYYMMDD', or ISO date string") from e
+    now64 = np.datetime64(int(now.timestamp()), "s")
+    tte_seconds = (expiry64 - now64) / np.timedelta64(1, "s")
+    df["tte"] = tte_seconds / (365.25 * 24 * 3600)
     df["tte"] = df["tte"].clip(lower=1e-6)  # avoid zero/negative
 
     # ── Moneyness ────────────────────────────────────────────────────────
