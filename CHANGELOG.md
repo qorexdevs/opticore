@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.1] - 2026-06-28
+
 ### Fixed
 - Time-to-expiry across the whole chain module no longer routes through pandas
   datetime constructors. `pd.to_datetime` / `pd.DatetimeIndex` go through
