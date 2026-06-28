@@ -17,6 +17,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   a `_tte_years` helper that parses expiry with numpy `datetime64` (`asi8` for
   datetime columns, regex-normalized strings otherwise). `YYYYMMDD`, ISO 8601
   and `pd.Timestamp` expiry columns all continue to work.
+- The cibuildwheel wheel smoke test no longer runs `test_chain.py` /
+  `test_yfinance_adapter.py`; their fixtures call `pd.to_datetime` directly,
+  which trips the same manylinux2014 segfault. Both are pure data-pipeline
+  tests already covered by the full CI matrix, so the wheel test now just
+  verifies the compiled core loads and prices correctly.
 
 ## [0.4.0] - 2026-06-28
 
