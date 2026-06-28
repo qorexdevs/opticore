@@ -12,6 +12,29 @@ import pandas as pd
 logger = logging.getLogger(__name__)
 
 
+def _tte_years(expiry: pd.Series, now: datetime) -> pd.Series:
+    """Years from ``now`` to each expiry, without pandas datetime constructors.
+
+    pd.to_datetime / pd.DatetimeIndex both route through tslibs
+    ._construct_from_dt64_naive, which segfaults in manylinux2014 (pandas 2.3,
+    cp312). numpy's datetime64 parser is independent of pandas tslibs.
+    """
+    if pd.api.types.is_datetime64_any_dtype(expiry):
+        ea = expiry.array
+        unit = getattr(ea.dtype, "unit", "ns")
+        expiry64 = ea.asi8.view(f"datetime64[{unit}]").astype("datetime64[s]")
+    else:
+        s = expiry.astype(str).str.strip()
+        iso = s.str.replace(r"^(\d{4})(\d{2})(\d{2})$", r"\1-\2-\3", regex=True)
+        try:
+            expiry64 = np.asarray(iso.to_numpy(), dtype="datetime64[s]")
+        except (ValueError, TypeError) as e:
+            raise ValueError("expiry must be a Timestamp, 'YYYYMMDD', or ISO date string") from e
+    now64 = np.datetime64(int(now.timestamp()), "s")
+    tte = (expiry64 - now64) / np.timedelta64(1, "s") / (365.25 * 24 * 3600)
+    return pd.Series(tte, index=expiry.index)
+
+
 def check_connection(
     host: str = "127.0.0.1",
     port: int = 7497,
@@ -182,31 +205,8 @@ def enrich(
 
     # ── Time to expiry in years ──────────────────────────────────────────
     # Accept either pd.Timestamp column or "YYYYMMDD" / ISO date strings.
-    # Avoid pandas datetime constructors throughout: pd.to_datetime and
-    # pd.DatetimeIndex both route through tslibs._construct_from_dt64_naive,
-    # which segfaults in manylinux2014 (pandas 2.3, cp312).
     now = datetime.now(timezone.utc)
-    expiry = df["expiry"]
-    if pd.api.types.is_datetime64_any_dtype(expiry):
-        # Bypass pd.DatetimeIndex: its _construct_from_dt64_naive segfaults in
-        # manylinux2014 (pandas 2.3, cp312). Read the raw int64 backing store
-        # instead - asi8 is always UTC epoch in the array's native unit.
-        ea = expiry.array
-        unit = getattr(ea.dtype, "unit", "ns")
-        expiry64 = ea.asi8.view(f"datetime64[{unit}]").astype("datetime64[s]")
-    else:
-        # Normalize "YYYYMMDD" to "YYYY-MM-DD"; ISO strings already match and
-        # are left untouched, then numpy parses both.
-        s = expiry.astype(str).str.strip()
-        iso = s.str.replace(r"^(\d{4})(\d{2})(\d{2})$", r"\1-\2-\3", regex=True)
-        try:
-            expiry64 = np.asarray(iso.to_numpy(), dtype="datetime64[s]")
-        except (ValueError, TypeError) as e:
-            raise ValueError("expiry must be a Timestamp, 'YYYYMMDD', or ISO date string") from e
-    now64 = np.datetime64(int(now.timestamp()), "s")
-    tte_seconds = (expiry64 - now64) / np.timedelta64(1, "s")
-    df["tte"] = tte_seconds / (365.25 * 24 * 3600)
-    df["tte"] = df["tte"].clip(lower=1e-6)  # avoid zero/negative
+    df["tte"] = _tte_years(df["expiry"], now).clip(lower=1e-6)  # avoid zero/negative
 
     # ── Moneyness ────────────────────────────────────────────────────────
     df["moneyness"] = df["strike"] / df["underlying_price"]
@@ -410,9 +410,7 @@ def parity_check(
 
     # Time to expiry in years (accept Timestamp or legacy string)
     now = datetime.now(timezone.utc)
-    expiry_dt = pd.to_datetime(p["expiry"], utc=True)
-    tte = (expiry_dt - now).dt.total_seconds() / (365.25 * 24 * 3600)
-    tte = tte.clip(lower=1e-6).to_numpy(dtype=np.float64)
+    tte = _tte_years(p["expiry"], now).clip(lower=1e-6).to_numpy(dtype=np.float64)
 
     S = p["underlying_price"].to_numpy(dtype=np.float64)
     K = p["strike"].to_numpy(dtype=np.float64)
@@ -477,8 +475,7 @@ def implied_forward(
         )
 
     now = datetime.now(timezone.utc)
-    expiry_dt = pd.to_datetime(p["expiry"], utc=True)
-    p = p.assign(_tte=(expiry_dt - now).dt.total_seconds() / (365.25 * 24 * 3600))
+    p = p.assign(_tte=_tte_years(p["expiry"], now))
     # F per row from parity; average the k nearest spot per expiry.
     p["_F_row"] = p["strike"] + np.exp(rate * p["_tte"]) * (p["call_mid"] - p["put_mid"])
     p["_dist"] = (p["strike"] - p["underlying_price"]).abs()
@@ -824,8 +821,7 @@ def straddle(
         return pd.DataFrame(columns=cols)
 
     now = datetime.now(timezone.utc)
-    expiry_dt = pd.to_datetime(p["expiry"], utc=True)
-    p = p.assign(_tte=(expiry_dt - now).dt.total_seconds() / (365.25 * 24 * 3600))
+    p = p.assign(_tte=_tte_years(p["expiry"], now))
     p["_dist"] = (p["strike"] - p["underlying_price"]).abs()
 
     rows = []
@@ -904,8 +900,7 @@ def strangle(
         return pd.DataFrame(columns=cols)
 
     now = datetime.now(timezone.utc)
-    expiry_dt = pd.to_datetime(p["expiry"], utc=True)
-    p = p.assign(_tte=(expiry_dt - now).dt.total_seconds() / (365.25 * 24 * 3600))
+    p = p.assign(_tte=_tte_years(p["expiry"], now))
 
     rows = []
     for exp, grp in p.groupby("expiry", sort=True):
@@ -1007,8 +1002,7 @@ def vertical(
         return pd.DataFrame(columns=cols)
 
     now = datetime.now(timezone.utc)
-    expiry_dt = pd.to_datetime(p["expiry"], utc=True)
-    p = p.assign(_tte=(expiry_dt - now).dt.total_seconds() / (365.25 * 24 * 3600))
+    p = p.assign(_tte=_tte_years(p["expiry"], now))
 
     prem_col = "call_mid" if kind == "call" else "put_mid"
     # bull is long the low strike, bear is long the high strike (both kinds)
@@ -1143,8 +1137,7 @@ def butterfly(
         return pd.DataFrame(columns=cols)
 
     now = datetime.now(timezone.utc)
-    expiry_dt = pd.to_datetime(p["expiry"], utc=True)
-    p = p.assign(_tte=(expiry_dt - now).dt.total_seconds() / (365.25 * 24 * 3600))
+    p = p.assign(_tte=_tte_years(p["expiry"], now))
 
     prem_col = "call_mid" if kind == "call" else "put_mid"
     sign = 1.0 if side == "long" else -1.0
@@ -1283,8 +1276,7 @@ def iron_condor(
         return pd.DataFrame(columns=cols)
 
     now = datetime.now(timezone.utc)
-    expiry_dt = pd.to_datetime(p["expiry"], utc=True)
-    p = p.assign(_tte=(expiry_dt - now).dt.total_seconds() / (365.25 * 24 * 3600))
+    p = p.assign(_tte=_tte_years(p["expiry"], now))
 
     sign = 1.0 if side == "long" else -1.0
 
@@ -1408,8 +1400,7 @@ def collar(
         return pd.DataFrame(columns=cols)
 
     now = datetime.now(timezone.utc)
-    expiry_dt = pd.to_datetime(p["expiry"], utc=True)
-    p = p.assign(_tte=(expiry_dt - now).dt.total_seconds() / (365.25 * 24 * 3600))
+    p = p.assign(_tte=_tte_years(p["expiry"], now))
 
     rows = []
     for exp, grp in p.groupby("expiry", sort=True):

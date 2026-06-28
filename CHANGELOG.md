@@ -8,11 +8,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Fixed
-- `enrich()`: read datetime expiry via `DatetimeArray.asi8` raw integer backing store
-  instead of `pd.DatetimeIndex`. The `DatetimeIndex` constructor routes through
-  `_construct_from_dt64_naive` which segfaults in manylinux2014 (pandas 2.3, cp312);
-  the `asi8` path is pure C arithmetic and avoids it entirely. String expiry
-  (`YYYYMMDD` / ISO 8601) and `pd.Timestamp` columns all continue to work.
+- Time-to-expiry across the whole chain module no longer routes through pandas
+  datetime constructors. `pd.to_datetime` / `pd.DatetimeIndex` go through
+  `_construct_from_dt64_naive`, which segfaults in manylinux2014 (pandas 2.3,
+  cp312) - so `implied_forward`, `put_call_parity`, the strategy builders
+  (`vertical`, `straddle`, `strangle`, `iron_condor`, `butterfly`, `collar`)
+  and `enrich` would all crash for cp312 users, not only in CI. They now share
+  a `_tte_years` helper that parses expiry with numpy `datetime64` (`asi8` for
+  datetime columns, regex-normalized strings otherwise). `YYYYMMDD`, ISO 8601
+  and `pd.Timestamp` expiry columns all continue to work.
 
 ## [0.4.0] - 2026-06-28
 
