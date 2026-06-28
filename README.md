@@ -152,14 +152,17 @@ oc.dollar_volume(chain)   # => premium turnover, dollar_volume_pcr per expiry
 
 # Where the open interest concentrates - the strikes that act as walls
 oc.oi_walls(chain)        # => call_wall, put_wall and their OI per expiry
+oc.volume_walls(chain)    # => the same walls keyed on traded volume per expiry
 
 # Day's volume against standing OI - flags fresh positioning vs old carry
 oc.turnover(chain)        # => call/put turnover per expiry
 ```
 
-Each has a `*_by_strike` companion (`pcr_by_strike`, `turnover_by_strike`,
-`oi_profile`, `volume_profile`, ...) that collapses the expiry axis and keeps a
-row per strike when you want the strike map instead of the per-expiry summary.
+Each ratio has a `*_by_strike` companion (`pcr_by_strike`, `turnover_by_strike`,
+`dollar_volume_by_strike`, `liquidity_by_strike`) that collapses the expiry axis
+and keeps a row per strike when you want the strike map instead of the per-expiry
+summary. `oi_profile` and `volume_profile` give the raw OI/volume shape across
+strikes the same way.
 
 One more reads the Greeks rather than raw counts, so it wants an enriched chain:
 
