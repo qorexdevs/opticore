@@ -181,17 +181,19 @@ def enrich(
         raise KeyError(f"Chain has no {price_col!r} column.")
 
     # ── Time to expiry in years ──────────────────────────────────────────
-    # Accept either pd.Timestamp (current schema) or "YYYYMMDD" / ISO strings.
-    # Parse via numpy's own datetime64 reader, not pandas to_datetime: the
-    # pandas tslibs strptime path segfaults inside the manylinux test image,
-    # while numpy's C ISO parser is independent of it.
+    # Accept either pd.Timestamp column or "YYYYMMDD" / ISO date strings.
+    # Avoid pandas datetime constructors throughout: pd.to_datetime and
+    # pd.DatetimeIndex both route through tslibs._construct_from_dt64_naive,
+    # which segfaults in manylinux2014 (pandas 2.3, cp312).
     now = datetime.now(timezone.utc)
     expiry = df["expiry"]
     if pd.api.types.is_datetime64_any_dtype(expiry):
-        idx = pd.DatetimeIndex(expiry)
-        if idx.tz is not None:
-            idx = idx.tz_convert("UTC").tz_localize(None)
-        expiry64 = idx.to_numpy(dtype="datetime64[s]")
+        # Bypass pd.DatetimeIndex: its _construct_from_dt64_naive segfaults in
+        # manylinux2014 (pandas 2.3, cp312). Read the raw int64 backing store
+        # instead - asi8 is always UTC epoch in the array's native unit.
+        ea = expiry.array
+        unit = getattr(ea.dtype, "unit", "ns")
+        expiry64 = ea.asi8.view(f"datetime64[{unit}]").astype("datetime64[s]")
     else:
         # Normalize "YYYYMMDD" to "YYYY-MM-DD"; ISO strings already match and
         # are left untouched, then numpy parses both.

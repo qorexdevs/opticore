@@ -8,12 +8,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Fixed
-- `enrich()`: parse `expiry` through numpy's `datetime64` reader instead of
-  `pd.to_datetime`. The pandas strptime path segfaulted inside the manylinux wheel
-  test and broke the release build; numpy's C ISO parser is independent of it.
-  `YYYYMMDD` and ISO 8601 strings both work, unparseable values raise a clear
-  `ValueError`. Also dropped the `numpy<2.5` pin from the wheel test env, which had
-  pulled in an ABI-mismatched numpy and started crashing the Windows wheels too.
+- `enrich()`: read datetime expiry via `DatetimeArray.asi8` raw integer backing store
+  instead of `pd.DatetimeIndex`. The `DatetimeIndex` constructor routes through
+  `_construct_from_dt64_naive` which segfaults in manylinux2014 (pandas 2.3, cp312);
+  the `asi8` path is pure C arithmetic and avoids it entirely. String expiry
+  (`YYYYMMDD` / ISO 8601) and `pd.Timestamp` columns all continue to work.
 
 ## [0.4.0] - 2026-06-28
 
