@@ -22,6 +22,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   which trips the same manylinux2014 segfault. Both are pure data-pipeline
   tests already covered by the full CI matrix, so the wheel test now just
   verifies the compiled core loads and prices correctly.
+- `_pivot_call_put` now strips timezone from `DatetimeTZDtype` expiry columns
+  via `asi8` before `pivot_table` / `groupby`, the same approach used in
+  `_tte_years`. Fixes the remaining manylinux2014 cp312 segfault in
+  `parity_check` and `implied_forward` when callers pass UTC-aware timestamps.
 
 ## [0.4.0] - 2026-06-28
 

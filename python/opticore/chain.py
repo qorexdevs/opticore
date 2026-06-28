@@ -303,6 +303,13 @@ def _pivot_call_put(chain: pd.DataFrame, price_col: str) -> pd.DataFrame:
     call_mid, put_mid (only rows where BOTH call and put exist).
     """
     df = chain.copy()
+    # Normalize tz-aware timestamps to UTC-naive: pivot_table/groupby on
+    # DatetimeTZDtype triggers a tslibs segfault in manylinux2014 (pandas 2.3, cp312).
+    if "expiry" in df.columns and pd.api.types.is_datetime64_any_dtype(df["expiry"]):
+        ea = df["expiry"].array
+        if hasattr(ea, "tz") and ea.tz is not None:
+            unit = getattr(ea.dtype, "unit", "ns")
+            df["expiry"] = ea.asi8.view(f"datetime64[{unit}]")
     if price_col == "mid" and "mid" not in df.columns and {"bid", "ask"}.issubset(df.columns):
         df["mid"] = (df["bid"] + df["ask"]) / 2.0
     if price_col not in df.columns:
