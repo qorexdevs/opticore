@@ -237,7 +237,7 @@ class TestEnrich:
 
     def test_accepts_timestamp_expiry(self):
         chain = _make_chain()
-        chain["expiry"] = pd.to_datetime(chain["expiry"], format="%Y%m%d", utc=True)
+        chain["expiry"] = pd.to_datetime(chain["expiry"], format="%Y%m%d").dt.tz_localize("UTC")
         enriched = oc.enrich(chain, rate=0.05)
         assert (enriched["tte"] > 0).all()
 
