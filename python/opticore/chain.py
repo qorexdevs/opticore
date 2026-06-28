@@ -21,7 +21,14 @@ def _tte_years(expiry: pd.Series, now: datetime) -> pd.Series:
     """
     if pd.api.types.is_datetime64_any_dtype(expiry):
         ea = expiry.array
-        unit = getattr(ea.dtype, "unit", "ns")
+        # pandas DatetimeTZDtype and DatetimeArray expose .unit directly;
+        # numpy dtype (for stripped naive columns) does not, so fall back to
+        # np.datetime_data which works for all datetime64 numpy dtypes.
+        unit = (
+            getattr(ea.dtype, "unit", None)
+            or getattr(ea, "unit", None)
+            or np.datetime_data(ea.dtype)[0]
+        )
         expiry64 = ea.asi8.view(f"datetime64[{unit}]").astype("datetime64[s]")
     else:
         s = expiry.astype(str).str.strip()

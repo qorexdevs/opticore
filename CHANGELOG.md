@@ -26,6 +26,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   via `asi8` before `pivot_table` / `groupby`, the same approach used in
   `_tte_years`. Fixes the remaining manylinux2014 cp312 segfault in
   `parity_check` and `implied_forward` when callers pass UTC-aware timestamps.
+- `_tte_years` now correctly detects the datetime64 resolution unit on
+  pandas 2.x. `DatetimeArray` (backing tz-stripped naive columns) does not
+  expose `.unit` on its numpy `dtype`; the old `getattr(ea.dtype, "unit", "ns")`
+  silently fell back to `"ns"` while actual values were in `"us"`, making
+  `parity_check` residuals wrong and `implied_forward` return empty on Python
+  3.11+. The lookup now tries `ea.dtype.unit` (DatetimeTZDtype), then `ea.unit`
+  (DatetimeArray), then `np.datetime_data(ea.dtype)[0]` (any numpy datetime64).
 
 ## [0.4.0] - 2026-06-28
 
