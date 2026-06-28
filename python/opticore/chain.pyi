@@ -167,3 +167,11 @@ def gamma_exposure(
     chain: pd.DataFrame,
     contract_size: float = ...,
 ) -> pd.DataFrame: ...
+def gamma_flip(
+    chain: pd.DataFrame,
+    rate: float = ...,
+    div_yield: float = ...,
+    contract_size: float = ...,
+    spot_range: float = ...,
+    n_points: int = ...,
+) -> pd.DataFrame: ...
