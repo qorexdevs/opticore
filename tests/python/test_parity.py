@@ -2122,12 +2122,8 @@ class TestGammaFlip:
         chain = self._enriched(underlying=100.0, n_strikes=11, **kw)
         calls = chain["kind"] == "call"
         puts = chain["kind"] == "put"
-        chain.loc[calls, "open_interest"] = np.where(
-            chain.loc[calls, "strike"] >= 100.0, 2000, 50
-        )
-        chain.loc[puts, "open_interest"] = np.where(
-            chain.loc[puts, "strike"] <= 100.0, 2000, 50
-        )
+        chain.loc[calls, "open_interest"] = np.where(chain.loc[calls, "strike"] >= 100.0, 2000, 50)
+        chain.loc[puts, "open_interest"] = np.where(chain.loc[puts, "strike"] <= 100.0, 2000, 50)
         return chain
 
     def test_returns_expected_columns(self):

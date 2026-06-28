@@ -2592,7 +2592,7 @@ def gamma_flip(
         ttes = grp["tte"].to_numpy(dtype=np.float64)
         ivs = grp["iv"].to_numpy(dtype=np.float64)
         oi = grp["open_interest"].to_numpy(dtype=np.float64)
-        is_call = (grp["_kind"].to_numpy() == "call")
+        is_call = grp["_kind"].to_numpy() == "call"
         sign = np.where(is_call, 1.0, -1.0)
         weight = sign * oi
 
