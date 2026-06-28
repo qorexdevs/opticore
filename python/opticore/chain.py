@@ -2588,11 +2588,12 @@ def gamma_flip(
     rows = []
     for exp, grp in df.groupby("expiry", sort=True):
         spot = float(grp["underlying_price"].iloc[0])
-        strikes = grp["strike"].to_numpy(dtype=np.float64)
-        ttes = grp["tte"].to_numpy(dtype=np.float64)
-        ivs = grp["iv"].to_numpy(dtype=np.float64)
+        _rw = lambda a, dt: np.require(a, dtype=dt, requirements=["C", "A", "W"])
+        strikes = _rw(grp["strike"].to_numpy(), np.float64)
+        ttes = _rw(grp["tte"].to_numpy(), np.float64)
+        ivs = _rw(grp["iv"].to_numpy(), np.float64)
         oi = grp["open_interest"].to_numpy(dtype=np.float64)
-        is_call = (grp["_kind"].to_numpy() == "call").astype(np.bool_)
+        is_call = _rw(grp["_kind"].to_numpy() == "call", bool)
         sign = np.where(is_call, 1.0, -1.0)
         weight = sign * oi
 
