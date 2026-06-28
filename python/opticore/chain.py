@@ -2585,10 +2585,12 @@ def gamma_flip(
     if df.empty:
         return pd.DataFrame(columns=cols)
 
+    def _rw(a, dt):
+        return np.require(a, dtype=dt, requirements=["C", "A", "W"])
+
     rows = []
     for exp, grp in df.groupby("expiry", sort=True):
         spot = float(grp["underlying_price"].iloc[0])
-        _rw = lambda a, dt: np.require(a, dtype=dt, requirements=["C", "A", "W"])
         strikes = _rw(grp["strike"].to_numpy(), np.float64)
         ttes = _rw(grp["tte"].to_numpy(), np.float64)
         ivs = _rw(grp["iv"].to_numpy(), np.float64)
