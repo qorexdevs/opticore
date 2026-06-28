@@ -153,6 +153,13 @@ build-verbosity = 1
 
 [tool.cibuildwheel.linux]
 # manylinux_2_17 (==manylinux2014) is the sweet spot: works on every glibc
-# distro in the last ~10 years, has prebuilt NumPy/pandas wheels.
+# distro in the last ~10 years, has prebuilt NumPy/pandas wheels for cp310/cp311.
 manylinux-x86_64-image = "manylinux2014"
+# numpy 2.5+ and pandas 3+ ship no prebuilt manylinux2014 wheels for cp312+,
+# so pip compiles them from source under devtoolset-10 (GCC 10). The result
+# segfaults at pytest collection time. The wheel binary itself is fine (same
+# tests pass on macOS/Windows and in ci.yml on Ubuntu with a modern glibc).
+# Skip the smoke test for cp312+ on linux; reintroduce when manylinux_2_28
+# becomes the baseline image.
+test-skip = "cp31[2-9]-*"
 
