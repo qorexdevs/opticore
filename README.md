@@ -171,6 +171,9 @@ enriched = oc.enrich(chain, rate=0.05)
 
 # Dealer gamma exposure: where hedging flow dampens or amplifies moves
 oc.gamma_exposure(enriched)  # => call_gex, put_gex, net_gex, gamma_wall_strike
+
+# Gamma flip: the spot where net dealer gamma crosses zero
+oc.gamma_flip(enriched, rate=0.05)  # => net_gex, flip_spot, flip_distance_pct, regime
 ```
 
 ## Installation Options

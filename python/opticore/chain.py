@@ -2509,3 +2509,142 @@ def gamma_exposure(chain: pd.DataFrame, contract_size: float = 100.0) -> pd.Data
         )
 
     return pd.DataFrame(rows, columns=cols)
+
+
+def gamma_flip(
+    chain: pd.DataFrame,
+    rate: float = 0.045,
+    div_yield: float = 0.0,
+    contract_size: float = 100.0,
+    spot_range: float = 0.2,
+    n_points: int = 81,
+) -> pd.DataFrame:
+    """Per-expiry gamma flip level: the spot where net dealer GEX crosses zero.
+
+    Net dealer gamma (long calls, short puts) depends on spot because each
+    option's gamma peaks near its own strike. Far below the book the short-put
+    leg tends to dominate (net short gamma, price-amplifying); far above it the
+    long-call leg dominates (net long gamma, price-dampening). The ``flip_spot``
+    is the level in between where net GEX changes sign - the "zero gamma" level
+    dealers' hedging flips around.
+
+    Gamma is recomputed at a grid of hypothetical spots spanning
+    ``spot * (1 +/- spot_range)`` using each option's recovered ``iv`` and time
+    to expiry, so the answer reflects the whole strike ladder, not just gamma at
+    the current spot. The crossing nearest the current spot is reported, linearly
+    interpolated between the two bracketing grid points. ``regime`` is the sign of
+    net GEX at the current spot: ``positive`` (dampening), ``negative``
+    (amplifying), or ``flat`` when the book nets to zero everywhere (a perfectly
+    symmetric call/put book cancels at every spot and has no flip).
+
+    Needs ``iv`` and ``tte`` from ``enrich`` plus ``open_interest``, ``strike``,
+    ``kind`` and ``underlying_price``. Rows with NaN iv contribute nothing; an
+    expiry with no usable gamma is skipped.
+
+    Parameters
+    ----------
+    chain : pd.DataFrame
+        An enriched chain (see ``enrich``); needs ``iv``, ``tte`` and
+        ``open_interest``.
+    rate, div_yield : float
+        BSM inputs for the gamma re-pricing (match what you passed to ``enrich``).
+    contract_size : float
+        Shares per contract (default: 100). Scales GEX but not ``flip_spot``.
+    spot_range : float
+        Half-width of the spot grid as a fraction of spot (default: 0.2 -> +/-20%).
+    n_points : int
+        Number of grid spots to scan (default: 81).
+
+    Returns
+    -------
+    pd.DataFrame
+        Columns: expiry, underlying_price, net_gex, flip_spot,
+        flip_distance_pct, regime. One row per expiry, sorted by expiry.
+        ``flip_spot`` and ``flip_distance_pct`` are NaN when no crossing falls in
+        the scanned range.
+    """
+    from opticore._core import _greeks_batch
+
+    cols = [
+        "expiry",
+        "underlying_price",
+        "net_gex",
+        "flip_spot",
+        "flip_distance_pct",
+        "regime",
+    ]
+    needed = {"kind", "iv", "tte", "open_interest", "strike", "underlying_price"}
+    if chain.empty or not needed.issubset(chain.columns) or n_points < 2:
+        return pd.DataFrame(columns=cols)
+
+    df = chain.copy()
+    df["_kind"] = (
+        df["kind"].str.lower().map({"call": "call", "c": "call", "put": "put", "p": "put"})
+    )
+    df = df.dropna(subset=["_kind", "iv", "tte", "open_interest", "strike"])
+    if df.empty:
+        return pd.DataFrame(columns=cols)
+
+    rows = []
+    for exp, grp in df.groupby("expiry", sort=True):
+        spot = float(grp["underlying_price"].iloc[0])
+        strikes = grp["strike"].to_numpy(dtype=np.float64)
+        ttes = grp["tte"].to_numpy(dtype=np.float64)
+        ivs = grp["iv"].to_numpy(dtype=np.float64)
+        oi = grp["open_interest"].to_numpy(dtype=np.float64)
+        is_call = (grp["_kind"].to_numpy() == "call")
+        sign = np.where(is_call, 1.0, -1.0)
+        weight = sign * oi
+
+        grid = np.linspace(spot * (1.0 - spot_range), spot * (1.0 + spot_range), n_points)
+        net = np.empty(n_points)
+        gross = np.empty(n_points)
+        for i, s in enumerate(grid):
+            s_arr = np.full(strikes.shape, s, dtype=np.float64)
+            _, _, gamma, _, _, _ = _greeks_batch(
+                s_arr, strikes, ttes, float(rate), ivs, float(div_yield), is_call
+            )
+            gamma = np.nan_to_num(np.asarray(gamma), nan=0.0)
+            scale = contract_size * s * s * 0.01
+            net[i] = float(np.sum(weight * gamma)) * scale
+            gross[i] = float(np.sum(np.abs(weight) * gamma)) * scale
+
+        # a near-symmetric book nets to floating-point noise, not a real
+        # exposure, so judge sign relative to the gross gamma on the book
+        tol = 1e-6 * float(np.max(gross)) if gross.size else 0.0
+
+        net_spot = float(np.interp(spot, grid, net))
+        if net_spot > tol:
+            regime = "positive"
+        elif net_spot < -tol:
+            regime = "negative"
+        else:
+            regime = "flat"
+
+        flip = float("nan")
+        crossings = np.nonzero(np.diff(np.sign(net)) != 0)[0]
+        if crossings.size and np.max(np.abs(net)) > tol:
+            # pick the crossing whose interpolated spot is closest to current spot
+            best = float("nan")
+            for j in crossings:
+                a, b = net[j], net[j + 1]
+                if a == b:
+                    continue
+                x = grid[j] + (grid[j + 1] - grid[j]) * (-a) / (b - a)
+                if np.isnan(best) or abs(x - spot) < abs(best - spot):
+                    best = x
+            flip = best
+
+        dist = (flip / spot - 1.0) * 100.0 if not np.isnan(flip) else float("nan")
+        rows.append(
+            {
+                "expiry": exp,
+                "underlying_price": spot,
+                "net_gex": net_spot,
+                "flip_spot": flip,
+                "flip_distance_pct": dist,
+                "regime": regime,
+            }
+        )
+
+    return pd.DataFrame(rows, columns=cols)

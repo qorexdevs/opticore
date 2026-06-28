@@ -53,6 +53,13 @@ def positioning():
     print(f"gamma exposure  net {r['net_gex']:.3e} ({lean}), "
           f"wall at strike {r['gamma_wall_strike']:.0f}")
 
+    flip = oc.gamma_flip(enriched, rate=0.045, div_yield=0.013).iloc[0]
+    if flip["flip_spot"] == flip["flip_spot"]:  # not NaN
+        print(f"gamma flip      {flip['regime']} at spot {flip['underlying_price']:.2f}, "
+              f"flip near {flip['flip_spot']:.2f} ({flip['flip_distance_pct']:+.1f}%)")
+    else:
+        print(f"gamma flip      {flip['regime']}, no flip in scanned range")
+
 
 if __name__ == "__main__":
     for name, fn in [

@@ -2112,6 +2112,68 @@ class TestGammaExposure:
         assert out.empty
 
 
+class TestGammaFlip:
+    def _enriched(self, **kw):
+        return oc.enrich(_synthetic_chain(**kw), rate=0.05)
+
+    def _skewed(self, **kw):
+        # puts piled low, calls piled high -> short gamma below, long gamma above,
+        # so net GEX must cross zero somewhere in the middle.
+        chain = self._enriched(underlying=100.0, n_strikes=11, **kw)
+        calls = chain["kind"] == "call"
+        puts = chain["kind"] == "put"
+        chain.loc[calls, "open_interest"] = np.where(
+            chain.loc[calls, "strike"] >= 100.0, 2000, 50
+        )
+        chain.loc[puts, "open_interest"] = np.where(
+            chain.loc[puts, "strike"] <= 100.0, 2000, 50
+        )
+        return chain
+
+    def test_returns_expected_columns(self):
+        out = oc.gamma_flip(self._enriched(expiry_days=(30,)), rate=0.05)
+        for col in (
+            "expiry",
+            "underlying_price",
+            "net_gex",
+            "flip_spot",
+            "flip_distance_pct",
+            "regime",
+        ):
+            assert col in out.columns
+
+    def test_one_row_per_expiry_sorted(self):
+        out = oc.gamma_flip(self._enriched(expiry_days=(120, 30, 60)), rate=0.05)
+        assert len(out) == 3
+        assert list(out["expiry"]) == sorted(out["expiry"])
+
+    def test_symmetric_book_is_flat_no_flip(self):
+        # equal call/put OI at every strike -> net cancels at all spots
+        r = oc.gamma_flip(self._enriched(expiry_days=(30,)), rate=0.05).iloc[0]
+        assert r["regime"] == "flat"
+        assert np.isnan(r["flip_spot"])
+
+    def test_skewed_book_has_flip_in_range(self):
+        r = oc.gamma_flip(self._skewed(expiry_days=(30,)), rate=0.05).iloc[0]
+        assert not np.isnan(r["flip_spot"])
+        # crossing should land inside the +/-20% scan window
+        assert 80.0 < r["flip_spot"] < 120.0
+
+    def test_flip_distance_matches_spot(self):
+        r = oc.gamma_flip(self._skewed(expiry_days=(30,)), rate=0.05).iloc[0]
+        expected = (r["flip_spot"] / r["underlying_price"] - 1.0) * 100.0
+        assert r["flip_distance_pct"] == pytest.approx(expected)
+
+    def test_no_iv_column_returns_empty(self):
+        out = oc.gamma_flip(_synthetic_chain(expiry_days=(30,)))
+        assert out.empty
+        assert "flip_spot" in out.columns
+
+    def test_in_public_api(self):
+        assert hasattr(oc, "gamma_flip")
+        assert callable(oc.gamma_flip)
+
+
 def test_max_pain_in_public_api():
     assert hasattr(oc, "max_pain")
     assert callable(oc.max_pain)

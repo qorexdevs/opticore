@@ -8,6 +8,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- `gamma_flip()`: per-expiry gamma flip level - the spot where net dealer GEX crosses zero.
+  Recomputes gamma on a grid of hypothetical spots (default +/-20%, 81 points) from each
+  option's recovered `iv` and time to expiry, finds the sign change of net GEX nearest the
+  current spot and linearly interpolates the crossing. Reports `net_gex`, `flip_spot`,
+  `flip_distance_pct` and a `regime` flag (`positive` dampening, `negative` amplifying,
+  `flat` when a symmetric book cancels everywhere). Complements the single-spot
+  `gamma_exposure`.
 - `gamma_exposure()`: per-expiry dealer gamma exposure (GEX) from open interest and the
   enriched `gamma` column. Treats dealers as long call gamma and short put gamma, scales
   each leg by `gamma * open_interest * contract_size * spot**2 * 0.01` (dollar gamma per 1%
