@@ -235,6 +235,26 @@ class TestEnrich:
         with pytest.raises(KeyError, match="has no 'nope' column"):
             oc.enrich(chain, price_col="nope")
 
+    def test_accepts_timestamp_expiry(self):
+        chain = _make_chain()
+        chain["expiry"] = pd.to_datetime(chain["expiry"], format="%Y%m%d", utc=True)
+        enriched = oc.enrich(chain, rate=0.05)
+        assert (enriched["tte"] > 0).all()
+
+    def test_accepts_iso_expiry(self):
+        chain = _make_chain()
+        chain["expiry"] = pd.to_datetime(
+            chain["expiry"], format="%Y%m%d"
+        ).dt.strftime("%Y-%m-%d")
+        enriched = oc.enrich(chain, rate=0.05)
+        assert (enriched["tte"] > 0).all()
+
+    def test_unparseable_expiry_raises(self):
+        chain = _make_chain()
+        chain["expiry"] = "not-a-date"
+        with pytest.raises(ValueError, match="expiry must be"):
+            oc.enrich(chain, rate=0.05)
+
 
 class TestEnrichPerformance:
     """Lock in vectorized enrich performance (Issue #21)."""

@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- `enrich()`: parse string `expiry` values with explicit formats (`YYYYMMDD` then
+  ISO 8601) instead of letting `pd.to_datetime` guess. The guesser's strptime fallback
+  segfaulted in the manylinux wheel test, which broke the release build. Unparseable
+  values now raise a clear `ValueError`.
+
 ## [0.4.0] - 2026-06-28
 
 ### Added

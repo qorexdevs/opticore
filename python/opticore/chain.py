@@ -181,10 +181,22 @@ def enrich(
         raise KeyError(f"Chain has no {price_col!r} column.")
 
     # ── Time to expiry in years ──────────────────────────────────────────
-    # Accept either pd.Timestamp (current schema) or legacy "YYYYMMDD" /
-    # "YYYY-MM-DD" strings (pandas can parse both via to_datetime).
+    # Accept either pd.Timestamp (current schema) or "YYYYMMDD" / ISO strings.
+    # We parse strings with explicit formats instead of letting to_datetime
+    # guess: the guesser routes through a strptime fallback that segfaults on
+    # some manylinux pandas builds when handed bare "YYYYMMDD" values.
     now = datetime.now(timezone.utc)
-    expiry_dt = pd.to_datetime(df["expiry"], utc=True)
+    expiry = df["expiry"]
+    if pd.api.types.is_datetime64_any_dtype(expiry):
+        expiry_dt = pd.to_datetime(expiry, utc=True)
+    else:
+        s = expiry.astype(str).str.strip()
+        expiry_dt = pd.to_datetime(s, format="%Y%m%d", utc=True, errors="coerce")
+        if expiry_dt.isna().any():
+            iso = pd.to_datetime(s, format="ISO8601", utc=True, errors="coerce")
+            expiry_dt = expiry_dt.fillna(iso)
+        if expiry_dt.isna().any():
+            raise ValueError("expiry must be a Timestamp, 'YYYYMMDD', or ISO date string")
     df["tte"] = (expiry_dt - now).dt.total_seconds() / (365.25 * 24 * 3600)
     df["tte"] = df["tte"].clip(lower=1e-6)  # avoid zero/negative
 
