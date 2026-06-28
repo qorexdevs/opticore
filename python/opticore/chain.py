@@ -2600,17 +2600,22 @@ def gamma_flip(
         weight = sign * oi
 
         grid = np.linspace(spot * (1.0 - spot_range), spot * (1.0 + spot_range), n_points)
-        net = np.empty(n_points)
-        gross = np.empty(n_points)
-        for i, s in enumerate(grid):
-            s_arr = np.full(strikes.shape, s, dtype=np.float64)
-            _, _, gamma, _, _, _ = _greeks_batch(
-                s_arr, strikes, ttes, float(rate), ivs, float(div_yield), is_call
-            )
-            gamma = np.nan_to_num(np.asarray(gamma), nan=0.0)
-            scale = contract_size * s * s * 0.01
-            net[i] = float(np.sum(weight * gamma)) * scale
-            gross[i] = float(np.sum(np.abs(weight) * gamma)) * scale
+        n_opts = len(strikes)
+
+        # single vectorized call instead of n_points separate calls - avoids
+        # repeated alloc/free of nanobind-owned arrays in manylinux environments
+        s_all = _rw(np.repeat(grid, n_opts), np.float64)
+        k_all = _rw(np.tile(strikes, n_points), np.float64)
+        t_all = _rw(np.tile(ttes, n_points), np.float64)
+        v_all = _rw(np.tile(ivs, n_points), np.float64)
+        ic_all = _rw(np.tile(is_call, n_points), bool)
+        _, _, gamma_all, _, _, _ = _greeks_batch(
+            s_all, k_all, t_all, float(rate), v_all, float(div_yield), ic_all
+        )
+        gamma_mat = np.nan_to_num(np.asarray(gamma_all), nan=0.0).reshape(n_points, n_opts)
+        scales = contract_size * grid * grid * 0.01
+        net = np.sum(weight * gamma_mat, axis=1) * scales
+        gross = np.sum(np.abs(weight) * gamma_mat, axis=1) * scales
 
         # a near-symmetric book nets to floating-point noise, not a real
         # exposure, so judge sign relative to the gross gamma on the book
