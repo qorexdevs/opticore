@@ -140,7 +140,7 @@ archs = ["auto64"]
 #     happens in ci.yml, not in cibuildwheel
 # `hypothesis` is required because test_properties.py imports it at module
 # level — pytest fails at collection time without it.
-test-requires = ["pytest", "hypothesis>=6.0", "numpy<2.5"]
+test-requires = ["pytest", "hypothesis>=6.0"]
 test-command = "pytest {project}/tests/python --ignore={project}/tests/python/test_plot.py --ignore={project}/tests/python/test_benchmarks.py -q --tb=short"
 
 # Build verbosity helps debug Windows failures without re-running CI.
@@ -150,3 +150,4 @@ build-verbosity = 1
 # manylinux_2_17 (==manylinux2014) is the sweet spot: works on every glibc
 # distro in the last ~10 years, has prebuilt NumPy/pandas wheels.
 manylinux-x86_64-image = "manylinux2014"
+
