@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-06-28
+
 ### Added
 - `gamma_flip()`: per-expiry gamma flip level - the spot where net dealer GEX crosses zero.
   Recomputes gamma on a grid of hypothetical spots (default +/-20%, 81 points) from each
