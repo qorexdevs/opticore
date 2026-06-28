@@ -243,9 +243,7 @@ class TestEnrich:
 
     def test_accepts_iso_expiry(self):
         chain = _make_chain()
-        chain["expiry"] = pd.to_datetime(
-            chain["expiry"], format="%Y%m%d"
-        ).dt.strftime("%Y-%m-%d")
+        chain["expiry"] = pd.to_datetime(chain["expiry"], format="%Y%m%d").dt.strftime("%Y-%m-%d")
         enriched = oc.enrich(chain, rate=0.05)
         assert (enriched["tte"] > 0).all()
 
