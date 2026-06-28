@@ -883,6 +883,70 @@ class TestMaxPain:
         assert out.empty
 
 
+class TestMaxPainCurve:
+    def _two_strike_chain(self):
+        # same hand-checked chain as TestMaxPain: pain(90)=2000, pain(110)=6000
+        return pd.DataFrame(
+            [
+                {
+                    "expiry": "2026-07-01",
+                    "strike": 90.0,
+                    "kind": "call",
+                    "open_interest": 300,
+                    "underlying_price": 100.0,
+                },
+                {
+                    "expiry": "2026-07-01",
+                    "strike": 110.0,
+                    "kind": "put",
+                    "open_interest": 100,
+                    "underlying_price": 100.0,
+                },
+            ]
+        )
+
+    def test_curve_matches_max_pain_minimum(self):
+        chain = self._two_strike_chain()
+        curve = oc.max_pain_curve(chain)
+        ref = oc.max_pain(chain).iloc[0]
+        pinned = curve[curve["is_max_pain"]]
+        assert len(pinned) == 1
+        assert pinned["strike"].iloc[0] == pytest.approx(ref["max_pain_strike"])
+        assert pinned["total_pain"].iloc[0] == pytest.approx(ref["pain_at_max_pain"])
+        assert curve["total_pain"].min() == pytest.approx(2000.0)
+        assert curve["total_pain"].max() == pytest.approx(6000.0)
+
+    def test_call_put_split_sums_to_total(self):
+        curve = oc.max_pain_curve(self._two_strike_chain())
+        assert (curve["call_pain"] + curve["put_pain"] == curve["total_pain"]).all()
+
+    def test_one_row_per_strike_sorted(self):
+        out = oc.max_pain_curve(_synthetic_chain(expiry_days=(60, 30)))
+        assert list(out["expiry"]) == sorted(out["expiry"])
+        for _, grp in out.groupby("expiry"):
+            assert list(grp["strike"]) == sorted(grp["strike"])
+            assert grp["is_max_pain"].sum() == 1
+
+    def test_returns_expected_columns(self):
+        out = oc.max_pain_curve(_synthetic_chain(expiry_days=(30,)))
+        for col in (
+            "expiry",
+            "underlying_price",
+            "strike",
+            "call_pain",
+            "put_pain",
+            "total_pain",
+            "is_max_pain",
+        ):
+            assert col in out.columns
+
+    def test_no_open_interest_column_returns_empty(self):
+        chain = _synthetic_chain(expiry_days=(30,)).drop(columns=["open_interest"])
+        out = oc.max_pain_curve(chain)
+        assert out.empty
+        assert "total_pain" in out.columns
+
+
 class TestPCR:
     def test_uniform_chain_is_one(self):
         # synthetic chain has equal call/put OI and volume everywhere

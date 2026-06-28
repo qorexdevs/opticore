@@ -1530,6 +1530,84 @@ def max_pain(chain: pd.DataFrame) -> pd.DataFrame:
     return pd.DataFrame(rows, columns=cols)
 
 
+def max_pain_curve(chain: pd.DataFrame) -> pd.DataFrame:
+    """Per-strike max-pain curve, the full payout shape behind ``max_pain``.
+
+    ``max_pain`` reports only the strike that minimises writer payout; this is the
+    curve it minimises over. For each expiry and each candidate settlement price S
+    (every listed strike) it returns the call pain ``sum(call_oi * max(S - K, 0))``,
+    the put pain ``sum(put_oi * max(K - S, 0))``, their total, and a flag marking
+    the max-pain strike. Charted against strike it's the pain profile traders read
+    to see how sharp the pin is, not just where it sits.
+
+    Pure open-interest arithmetic, no IV solve. Strikes missing OI count as zero;
+    an expiry with no open interest at all is skipped, matching ``max_pain``.
+
+    Parameters
+    ----------
+    chain : pd.DataFrame
+        Same schema as ``max_pain``; needs ``open_interest``.
+
+    Returns
+    -------
+    pd.DataFrame
+        Columns: expiry, underlying_price, strike, call_pain, put_pain,
+        total_pain, is_max_pain. One row per (expiry, strike), sorted by expiry
+        then strike.
+    """
+    cols = [
+        "expiry",
+        "underlying_price",
+        "strike",
+        "call_pain",
+        "put_pain",
+        "total_pain",
+        "is_max_pain",
+    ]
+    if chain.empty or "kind" not in chain.columns or "open_interest" not in chain.columns:
+        return pd.DataFrame(columns=cols)
+
+    df = chain.copy()
+    df["_kind"] = (
+        df["kind"].str.lower().map({"call": "call", "c": "call", "put": "put", "p": "put"})
+    )
+    df = df.dropna(subset=["_kind", "strike", "open_interest"])
+    if df.empty:
+        return pd.DataFrame(columns=cols)
+
+    rows = []
+    for exp, grp in df.groupby("expiry", sort=True):
+        price = float(grp["underlying_price"].iloc[0])
+        strikes = np.sort(grp["strike"].unique())
+        call_oi = grp[grp["_kind"] == "call"].groupby("strike")["open_interest"].sum()
+        put_oi = grp[grp["_kind"] == "put"].groupby("strike")["open_interest"].sum()
+        if float(call_oi.sum() + put_oi.sum()) <= 0:
+            continue
+
+        curve = []
+        for s in strikes:
+            call_pain = sum(float(oi) * (s - k) for k, oi in call_oi.items() if s > k)
+            put_pain = sum(float(oi) * (k - s) for k, oi in put_oi.items() if k > s)
+            curve.append((float(s), call_pain, put_pain))
+
+        min_total = min(c + p for _, c, p in curve)
+        for s, call_pain, put_pain in curve:
+            total = call_pain + put_pain
+            rows.append(
+                {
+                    "expiry": exp,
+                    "underlying_price": price,
+                    "strike": s,
+                    "call_pain": call_pain,
+                    "put_pain": put_pain,
+                    "total_pain": total,
+                    "is_max_pain": total == min_total,
+                }
+            )
+
+    return pd.DataFrame(rows, columns=cols)
+
+
 def pcr(chain: pd.DataFrame) -> pd.DataFrame:
     """Per-expiry put/call ratio from open interest and volume.
 

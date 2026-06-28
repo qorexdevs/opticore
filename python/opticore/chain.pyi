@@ -123,6 +123,9 @@ def collar(
 def max_pain(
     chain: pd.DataFrame,
 ) -> pd.DataFrame: ...
+def max_pain_curve(
+    chain: pd.DataFrame,
+) -> pd.DataFrame: ...
 def pcr(
     chain: pd.DataFrame,
 ) -> pd.DataFrame: ...

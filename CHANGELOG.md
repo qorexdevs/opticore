@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- `max_pain_curve` returns the per-strike pain curve behind `max_pain` - the
+  call/put writer payout at every candidate settlement and an `is_max_pain`
+  flag on the minimum, so you can chart how sharp the pin is instead of seeing
+  only the strike. Pure open-interest arithmetic like the rest of the family.
+
 ## [0.4.1] - 2026-06-28
 
 ### Fixed
