@@ -12,7 +12,7 @@ Quick start:
     0.4611...
 """
 
-__version__ = "0.4.1"
+__version__ = "0.5.0"
 
 from typing import NamedTuple, Union
 

@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-06-29
+
 ### Added
 - `plot.gamma_profile` draws the net dealer gamma curve for one expiry across
   the same spot grid `gamma_flip` scans, marking the current spot and the flip
