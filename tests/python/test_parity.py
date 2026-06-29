@@ -2170,6 +2170,74 @@ class TestDeltaExposure:
         assert oc.delta_exposure(chain).empty
 
 
+class TestDeltaExposureByStrike:
+    def _enriched(self, **kw):
+        return oc.enrich(_synthetic_chain(**kw), rate=0.05)
+
+    def test_returns_expected_columns(self):
+        out = oc.delta_exposure_by_strike(self._enriched(expiry_days=(30,)))
+        for col in (
+            "expiry",
+            "underlying_price",
+            "strike",
+            "call_dex",
+            "put_dex",
+            "net_dex",
+            "cumulative_net_dex",
+            "is_delta_wall",
+        ):
+            assert col in out.columns
+
+    def test_one_row_per_strike_sorted(self):
+        out = oc.delta_exposure_by_strike(self._enriched(expiry_days=(30,), n_strikes=11))
+        assert len(out) == 11
+        assert list(out["strike"]) == sorted(out["strike"])
+
+    def test_rows_sorted_by_expiry_then_strike(self):
+        out = oc.delta_exposure_by_strike(self._enriched(expiry_days=(60, 30), n_strikes=5))
+        assert len(out) == 10
+        for _, grp in out.groupby("expiry"):
+            assert list(grp["strike"]) == sorted(grp["strike"])
+        assert list(out["expiry"]) == sorted(out["expiry"])
+
+    def test_net_sums_to_aggregate(self):
+        # collapsing the profile back over strikes must reproduce delta_exposure
+        chain = self._enriched(expiry_days=(30,))
+        chain.loc[chain["kind"] == "call", "open_interest"] *= 3
+        agg = oc.delta_exposure(chain).iloc[0]
+        prof = oc.delta_exposure_by_strike(chain)
+        assert prof["net_dex"].sum() == pytest.approx(agg["net_dex"])
+        assert prof["call_dex"].sum() == pytest.approx(agg["call_dex"])
+        assert prof["put_dex"].sum() == pytest.approx(agg["put_dex"])
+
+    def test_cumulative_is_running_sum(self):
+        prof = oc.delta_exposure_by_strike(self._enriched(expiry_days=(30,), n_strikes=11))
+        assert list(prof["cumulative_net_dex"]) == pytest.approx(list(prof["net_dex"].cumsum()))
+        assert prof["cumulative_net_dex"].iloc[-1] == pytest.approx(prof["net_dex"].sum())
+
+    def test_one_wall_per_expiry_matches_aggregate(self):
+        chain = self._enriched(underlying=100.0, expiry_days=(30,), n_strikes=11)
+        prof = oc.delta_exposure_by_strike(chain)
+        walls = prof[prof["is_delta_wall"]]
+        assert len(walls) == 1
+        agg_wall = oc.delta_exposure(chain).iloc[0]["delta_wall_strike"]
+        assert walls.iloc[0]["strike"] == pytest.approx(agg_wall)
+
+    def test_no_delta_column_returns_empty(self):
+        out = oc.delta_exposure_by_strike(_synthetic_chain(expiry_days=(30,)))
+        assert out.empty
+        assert "cumulative_net_dex" in out.columns
+
+    def test_zero_oi_expiry_skipped(self):
+        chain = self._enriched(expiry_days=(30,))
+        chain["open_interest"] = 0
+        assert oc.delta_exposure_by_strike(chain).empty
+
+    def test_in_public_api(self):
+        assert hasattr(oc, "delta_exposure_by_strike")
+        assert callable(oc.delta_exposure_by_strike)
+
+
 class TestGammaExposure:
     def _enriched(self, **kw):
         return oc.enrich(_synthetic_chain(**kw), rate=0.05)

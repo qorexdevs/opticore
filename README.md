@@ -175,6 +175,7 @@ enriched = oc.enrich(chain, rate=0.05)
 
 # Dealer delta exposure: directional hedging lean from open interest
 oc.delta_exposure(enriched)  # => call_dex, put_dex, net_dex, delta_wall_strike
+oc.delta_exposure_by_strike(enriched)  # => the DEX profile per strike, cumulative_net_dex brackets the flip
 
 # Dealer gamma exposure: where hedging flow dampens or amplifies moves
 oc.gamma_exposure(enriched)  # => call_gex, put_gex, net_gex, gamma_wall_strike

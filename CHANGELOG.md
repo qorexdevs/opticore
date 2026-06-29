@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- `delta_exposure_by_strike` returns the per-strike DEX profile behind
+  `delta_exposure` - `call_dex`/`put_dex`/`net_dex` per strike plus a
+  `cumulative_net_dex` running up the board and an `is_delta_wall` flag on the
+  gross-delta peak. The directional sibling of `gamma_exposure_by_strike`, same
+  scaling as the aggregate so the columns sum back to it; the sign change in the
+  cumulative column brackets where net dealer delta flips.
+
 ## [0.5.0] - 2026-06-29
 
 ### Added

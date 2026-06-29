@@ -2613,6 +2613,98 @@ def delta_exposure(chain: pd.DataFrame, contract_size: float = 100.0) -> pd.Data
     return pd.DataFrame(rows, columns=cols)
 
 
+def delta_exposure_by_strike(chain: pd.DataFrame, contract_size: float = 100.0) -> pd.DataFrame:
+    """Per-strike dealer delta exposure, the profile behind ``delta_exposure``.
+
+    ``delta_exposure`` nets DEX to one row per expiry, which gives the directional
+    lean but hides where the dealer deltas sit. This keeps the strike axis: for
+    each expiry and strike it returns ``call_dex``, ``put_dex``, ``net_dex`` and a
+    ``cumulative_net_dex`` running up the strikes, plus ``is_delta_wall`` on the
+    strike carrying the most gross dollar delta. Charted against strike it's the
+    DEX profile that sits next to the GEX profile, and the sign change in
+    ``cumulative_net_dex`` brackets the strike where net dealer delta flips.
+
+    Same scaling and NaN rules as ``delta_exposure``: per option
+    ``sign * delta * open_interest * contract_size * S`` with ``sign`` +1 for
+    calls and -1 for puts and ``S`` the underlying price. Rows with NaN delta or
+    no open interest contribute nothing; an expiry with no usable delta is
+    skipped.
+
+    Parameters
+    ----------
+    chain : pd.DataFrame
+        An enriched chain (see ``enrich``); needs ``delta`` and ``open_interest``.
+    contract_size : float
+        Shares per contract (default: 100).
+
+    Returns
+    -------
+    pd.DataFrame
+        Columns: expiry, underlying_price, strike, call_dex, put_dex, net_dex,
+        cumulative_net_dex, is_delta_wall. One row per (expiry, strike), sorted
+        by expiry then strike.
+    """
+    cols = [
+        "expiry",
+        "underlying_price",
+        "strike",
+        "call_dex",
+        "put_dex",
+        "net_dex",
+        "cumulative_net_dex",
+        "is_delta_wall",
+    ]
+    needed = {"kind", "delta", "open_interest", "strike", "underlying_price"}
+    if chain.empty or not needed.issubset(chain.columns):
+        return pd.DataFrame(columns=cols)
+
+    df = chain.copy()
+    df["_kind"] = (
+        df["kind"].str.lower().map({"call": "call", "c": "call", "put": "put", "p": "put"})
+    )
+    df = df.dropna(subset=["_kind", "delta", "open_interest", "strike"])
+    if df.empty:
+        return pd.DataFrame(columns=cols)
+
+    rows = []
+    for exp, grp in df.groupby("expiry", sort=True):
+        spot = float(grp["underlying_price"].iloc[0])
+        scale = contract_size * spot
+        sign = np.where(grp["_kind"].to_numpy() == "call", 1.0, -1.0)
+        grp = grp.assign(
+            _dex=sign * grp["delta"].to_numpy() * grp["open_interest"].to_numpy() * scale,
+            _gross=np.abs(grp["delta"].to_numpy()) * grp["open_interest"].to_numpy() * scale,
+        )
+        gross_by_strike = grp.groupby("strike")["_gross"].sum()
+        if not (gross_by_strike > 0).any():
+            continue
+        wall = float(gross_by_strike.idxmax())
+
+        call_dex = grp.loc[grp["_kind"] == "call"].groupby("strike")["_dex"].sum()
+        put_dex = grp.loc[grp["_kind"] == "put"].groupby("strike")["_dex"].sum()
+
+        cum = 0.0
+        for s in np.sort(grp["strike"].unique()):
+            c = float(call_dex.get(s, 0.0))
+            p = float(put_dex.get(s, 0.0))
+            net = c + p
+            cum += net
+            rows.append(
+                {
+                    "expiry": exp,
+                    "underlying_price": spot,
+                    "strike": float(s),
+                    "call_dex": c,
+                    "put_dex": p,
+                    "net_dex": net,
+                    "cumulative_net_dex": cum,
+                    "is_delta_wall": float(s) == wall,
+                }
+            )
+
+    return pd.DataFrame(rows, columns=cols)
+
+
 def gamma_exposure(chain: pd.DataFrame, contract_size: float = 100.0) -> pd.DataFrame:
     """Per-expiry dealer gamma exposure (GEX) from open interest and Greeks.
 
