@@ -2176,6 +2176,74 @@ class TestGammaExposure:
         assert out.empty
 
 
+class TestGammaExposureByStrike:
+    def _enriched(self, **kw):
+        return oc.enrich(_synthetic_chain(**kw), rate=0.05)
+
+    def test_returns_expected_columns(self):
+        out = oc.gamma_exposure_by_strike(self._enriched(expiry_days=(30,)))
+        for col in (
+            "expiry",
+            "underlying_price",
+            "strike",
+            "call_gex",
+            "put_gex",
+            "net_gex",
+            "cumulative_net_gex",
+            "is_gamma_wall",
+        ):
+            assert col in out.columns
+
+    def test_one_row_per_strike_sorted(self):
+        out = oc.gamma_exposure_by_strike(self._enriched(expiry_days=(30,), n_strikes=11))
+        assert len(out) == 11
+        assert list(out["strike"]) == sorted(out["strike"])
+
+    def test_rows_sorted_by_expiry_then_strike(self):
+        out = oc.gamma_exposure_by_strike(self._enriched(expiry_days=(60, 30), n_strikes=5))
+        assert len(out) == 10
+        for _, grp in out.groupby("expiry"):
+            assert list(grp["strike"]) == sorted(grp["strike"])
+        assert list(out["expiry"]) == sorted(out["expiry"])
+
+    def test_net_sums_to_aggregate(self):
+        # collapsing the profile back over strikes must reproduce gamma_exposure
+        chain = self._enriched(expiry_days=(30,))
+        chain.loc[chain["kind"] == "call", "open_interest"] *= 3
+        agg = oc.gamma_exposure(chain).iloc[0]
+        prof = oc.gamma_exposure_by_strike(chain)
+        assert prof["net_gex"].sum() == pytest.approx(agg["net_gex"])
+        assert prof["call_gex"].sum() == pytest.approx(agg["call_gex"])
+        assert prof["put_gex"].sum() == pytest.approx(agg["put_gex"])
+
+    def test_cumulative_is_running_sum(self):
+        prof = oc.gamma_exposure_by_strike(self._enriched(expiry_days=(30,), n_strikes=11))
+        assert list(prof["cumulative_net_gex"]) == pytest.approx(list(prof["net_gex"].cumsum()))
+        assert prof["cumulative_net_gex"].iloc[-1] == pytest.approx(prof["net_gex"].sum())
+
+    def test_one_wall_per_expiry_matches_aggregate(self):
+        chain = self._enriched(underlying=100.0, expiry_days=(30,), n_strikes=11)
+        prof = oc.gamma_exposure_by_strike(chain)
+        walls = prof[prof["is_gamma_wall"]]
+        assert len(walls) == 1
+        agg_wall = oc.gamma_exposure(chain).iloc[0]["gamma_wall_strike"]
+        assert walls.iloc[0]["strike"] == pytest.approx(agg_wall)
+
+    def test_no_gamma_column_returns_empty(self):
+        out = oc.gamma_exposure_by_strike(_synthetic_chain(expiry_days=(30,)))
+        assert out.empty
+        assert "cumulative_net_gex" in out.columns
+
+    def test_zero_oi_expiry_skipped(self):
+        chain = self._enriched(expiry_days=(30,))
+        chain["open_interest"] = 0
+        assert oc.gamma_exposure_by_strike(chain).empty
+
+    def test_in_public_api(self):
+        assert hasattr(oc, "gamma_exposure_by_strike")
+        assert callable(oc.gamma_exposure_by_strike)
+
+
 class TestGammaFlip:
     def _enriched(self, **kw):
         return oc.enrich(_synthetic_chain(**kw), rate=0.05)

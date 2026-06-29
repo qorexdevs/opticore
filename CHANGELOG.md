@@ -8,6 +8,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- `gamma_exposure_by_strike` returns the per-strike GEX profile behind
+  `gamma_exposure` - `call_gex`/`put_gex`/`net_gex` per strike plus a
+  `cumulative_net_gex` running up the board and an `is_gamma_wall` flag on the
+  gross-gamma peak. Same scaling as the aggregate, so the columns sum back to
+  it; the sign change in the cumulative column brackets where net dealer gamma
+  flips.
 - `max_pain_curve` returns the per-strike pain curve behind `max_pain` - the
   call/put writer payout at every candidate settlement and an `is_max_pain`
   flag on the minimum, so you can chart how sharp the pin is instead of seeing
