@@ -56,3 +56,13 @@ def term_structure(
     fit: bool = ...,
     ax: Axes | None = ...,
 ) -> tuple[Figure, Axes]: ...
+def gamma_profile(
+    chain: pd.DataFrame,
+    expiry: str | pd.Timestamp | None = ...,
+    rate: float = ...,
+    div_yield: float = ...,
+    contract_size: float = ...,
+    spot_range: float = ...,
+    n_points: int = ...,
+    ax: Axes | None = ...,
+) -> tuple[Figure, Axes]: ...

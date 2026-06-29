@@ -401,3 +401,107 @@ def term_structure(
 
     fig.tight_layout()
     return fig, ax
+
+
+def gamma_profile(
+    chain,
+    expiry=None,
+    rate: float = 0.045,
+    div_yield: float = 0.0,
+    contract_size: float = 100.0,
+    spot_range: float = 0.2,
+    n_points: int = 81,
+    ax=None,
+):
+    """Plot the net dealer gamma profile and flip level for one expiry.
+
+    Sweeps net GEX across the same spot grid ``oc.gamma_flip`` scans, draws the
+    curve, marks the current spot and the flip level, and shades the
+    price-dampening (net long gamma, positive) and price-amplifying (net short
+    gamma, negative) regions so the shape around spot is readable at a glance.
+    Defaults to the nearest expiry; pass ``expiry`` to pick another, like
+    ``oc.plot.smile``.
+
+    Parameters
+    ----------
+    chain : pd.DataFrame
+        An enriched chain (see ``oc.enrich``); needs ``iv``, ``tte``,
+        ``open_interest``, ``strike``, ``kind`` and ``underlying_price``.
+    expiry : str, pd.Timestamp, or None
+        Expiry to plot. If None, the nearest (soonest) expiry is used.
+    rate, div_yield, contract_size, spot_range, n_points :
+        Passed straight through to the gamma scan; match what you gave
+        ``gamma_flip`` / ``enrich`` so the curve and the flip table agree.
+    ax : matplotlib.axes.Axes or None
+        Axes to plot on. If None, creates a new figure.
+
+    Returns
+    -------
+    (fig, ax) : tuple[matplotlib.figure.Figure, matplotlib.axes.Axes]
+        Standard matplotlib convention.
+    """
+    plt = _get_plt()
+    import pandas as pd
+
+    from opticore.chain import _scan_gamma_net
+
+    needed = {"kind", "iv", "tte", "open_interest", "strike", "underlying_price"}
+    missing = needed - set(chain.columns)
+    if missing:
+        raise ValueError(f"chain is missing columns for gamma profile: {sorted(missing)}")
+
+    df = chain.copy()
+    df["_kind"] = (
+        df["kind"].str.lower().map({"call": "call", "c": "call", "put": "put", "p": "put"})
+    )
+    df = df.dropna(subset=["_kind", "iv", "tte", "open_interest", "strike"])
+    if df.empty:
+        raise ValueError("No usable gamma data to plot after filtering.")
+
+    if expiry is not None:
+        target = pd.to_datetime(expiry, utc=True).normalize()
+        exp_norm = pd.to_datetime(df["expiry"], utc=True).dt.normalize()
+        grp = df[exp_norm == target]
+        if grp.empty:
+            raise ValueError(f"No rows for expiry {expiry!r}.")
+        label = pd.Timestamp(target).strftime("%Y-%m-%d")
+    else:
+        # nearest = soonest expiry = smallest time to expiry
+        nearest = df.loc[df["tte"].idxmin(), "expiry"]
+        grp = df[df["expiry"] == nearest]
+        label = (
+            pd.Timestamp(nearest).strftime("%Y-%m-%d")
+            if hasattr(nearest, "strftime")
+            else str(nearest)
+        )
+
+    grid, net, _gross, _net_spot, flip, regime = _scan_gamma_net(
+        grp, rate, div_yield, contract_size, spot_range, n_points
+    )
+    spot = float(grp["underlying_price"].iloc[0])
+
+    if ax is None:
+        fig, ax = plt.subplots(1, 1, figsize=(10, 6))
+    else:
+        fig = ax.get_figure()
+
+    ax.axhline(0, color="gray", linewidth=1, alpha=0.6)
+    ax.plot(grid, net, color="tab:blue", linewidth=2, label="Net GEX")
+    ax.fill_between(
+        grid, net, 0, where=net >= 0, color="tab:green", alpha=0.2, label="dampening (net long)"
+    )
+    ax.fill_between(
+        grid, net, 0, where=net < 0, color="tab:red", alpha=0.2, label="amplifying (net short)"
+    )
+    ax.axvline(spot, color="black", linestyle="--", alpha=0.7, label=f"Spot ({spot:.2f})")
+    if not np.isnan(flip):
+        ax.axvline(flip, color="tab:purple", linestyle=":", linewidth=2, label=f"Flip ({flip:.2f})")
+
+    ax.set_xlabel("Spot Price")
+    ax.set_ylabel("Net Dealer GEX")
+    ax.set_title(f"Gamma Profile {label} (regime: {regime})")
+    ax.legend(fontsize=9)
+    ax.grid(True, alpha=0.3)
+
+    fig.tight_layout()
+    return fig, ax

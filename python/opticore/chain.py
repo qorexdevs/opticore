@@ -2789,6 +2789,78 @@ def gamma_exposure_by_strike(chain: pd.DataFrame, contract_size: float = 100.0) 
     return pd.DataFrame(rows, columns=cols)
 
 
+def _scan_gamma_net(grp, rate, div_yield, contract_size, spot_range, n_points):
+    """Scan net and gross dealer GEX across a spot grid for one expiry group.
+
+    Shared by ``gamma_flip`` and ``opticore.plot.gamma_profile`` so the curve a
+    plot draws and the flip level a table reports always come from the same scan.
+    ``grp`` must already carry the ``_kind`` column and be filtered to usable
+    rows. Returns ``(grid, net, gross, net_spot, flip, regime)``: the spot grid,
+    net and gross GEX along it, net GEX interpolated at the current spot, the
+    flip level nearest spot (NaN when nothing crosses inside the window) and the
+    regime at spot (``positive``/``negative``/``flat``).
+    """
+    from opticore._core import _greeks_batch
+
+    def _rw(a, dt):
+        return np.require(a, dtype=dt, requirements=["C", "A", "W"])
+
+    spot = float(grp["underlying_price"].iloc[0])
+    strikes = _rw(grp["strike"].to_numpy(), np.float64)
+    ttes = _rw(grp["tte"].to_numpy(), np.float64)
+    ivs = _rw(grp["iv"].to_numpy(), np.float64)
+    oi = grp["open_interest"].to_numpy(dtype=np.float64)
+    is_call = _rw(grp["_kind"].to_numpy() == "call", bool)
+    sign = np.where(is_call, 1.0, -1.0)
+    weight = sign * oi
+
+    grid = np.linspace(spot * (1.0 - spot_range), spot * (1.0 + spot_range), n_points)
+    n_opts = len(strikes)
+
+    # single vectorized call instead of n_points separate calls - avoids
+    # repeated alloc/free of nanobind-owned arrays in manylinux environments
+    s_all = _rw(np.repeat(grid, n_opts), np.float64)
+    k_all = _rw(np.tile(strikes, n_points), np.float64)
+    t_all = _rw(np.tile(ttes, n_points), np.float64)
+    v_all = _rw(np.tile(ivs, n_points), np.float64)
+    ic_all = _rw(np.tile(is_call, n_points), bool)
+    _, _, gamma_all, _, _, _ = _greeks_batch(
+        s_all, k_all, t_all, float(rate), v_all, float(div_yield), ic_all
+    )
+    gamma_mat = np.nan_to_num(np.asarray(gamma_all), nan=0.0).reshape(n_points, n_opts)
+    scales = contract_size * grid * grid * 0.01
+    net = np.sum(weight * gamma_mat, axis=1) * scales
+    gross = np.sum(np.abs(weight) * gamma_mat, axis=1) * scales
+
+    # a near-symmetric book nets to floating-point noise, not a real
+    # exposure, so judge sign relative to the gross gamma on the book
+    tol = 1e-6 * float(np.max(gross)) if gross.size else 0.0
+
+    net_spot = float(np.interp(spot, grid, net))
+    if net_spot > tol:
+        regime = "positive"
+    elif net_spot < -tol:
+        regime = "negative"
+    else:
+        regime = "flat"
+
+    flip = float("nan")
+    crossings = np.nonzero(np.diff(np.sign(net)) != 0)[0]
+    if crossings.size and np.max(np.abs(net)) > tol:
+        # pick the crossing whose interpolated spot is closest to current spot
+        best = float("nan")
+        for j in crossings:
+            a, b = net[j], net[j + 1]
+            if a == b:
+                continue
+            x = grid[j] + (grid[j + 1] - grid[j]) * (-a) / (b - a)
+            if np.isnan(best) or abs(x - spot) < abs(best - spot):
+                best = x
+        flip = best
+
+    return grid, net, gross, net_spot, flip, regime
+
+
 def gamma_flip(
     chain: pd.DataFrame,
     rate: float = 0.045,
@@ -2841,8 +2913,6 @@ def gamma_flip(
         ``flip_spot`` and ``flip_distance_pct`` are NaN when no crossing falls in
         the scanned range.
     """
-    from opticore._core import _greeks_batch
-
     cols = [
         "expiry",
         "underlying_price",
@@ -2863,64 +2933,12 @@ def gamma_flip(
     if df.empty:
         return pd.DataFrame(columns=cols)
 
-    def _rw(a, dt):
-        return np.require(a, dtype=dt, requirements=["C", "A", "W"])
-
     rows = []
     for exp, grp in df.groupby("expiry", sort=True):
-        spot = float(grp["underlying_price"].iloc[0])
-        strikes = _rw(grp["strike"].to_numpy(), np.float64)
-        ttes = _rw(grp["tte"].to_numpy(), np.float64)
-        ivs = _rw(grp["iv"].to_numpy(), np.float64)
-        oi = grp["open_interest"].to_numpy(dtype=np.float64)
-        is_call = _rw(grp["_kind"].to_numpy() == "call", bool)
-        sign = np.where(is_call, 1.0, -1.0)
-        weight = sign * oi
-
-        grid = np.linspace(spot * (1.0 - spot_range), spot * (1.0 + spot_range), n_points)
-        n_opts = len(strikes)
-
-        # single vectorized call instead of n_points separate calls - avoids
-        # repeated alloc/free of nanobind-owned arrays in manylinux environments
-        s_all = _rw(np.repeat(grid, n_opts), np.float64)
-        k_all = _rw(np.tile(strikes, n_points), np.float64)
-        t_all = _rw(np.tile(ttes, n_points), np.float64)
-        v_all = _rw(np.tile(ivs, n_points), np.float64)
-        ic_all = _rw(np.tile(is_call, n_points), bool)
-        _, _, gamma_all, _, _, _ = _greeks_batch(
-            s_all, k_all, t_all, float(rate), v_all, float(div_yield), ic_all
+        _, _, _, net_spot, flip, regime = _scan_gamma_net(
+            grp, rate, div_yield, contract_size, spot_range, n_points
         )
-        gamma_mat = np.nan_to_num(np.asarray(gamma_all), nan=0.0).reshape(n_points, n_opts)
-        scales = contract_size * grid * grid * 0.01
-        net = np.sum(weight * gamma_mat, axis=1) * scales
-        gross = np.sum(np.abs(weight) * gamma_mat, axis=1) * scales
-
-        # a near-symmetric book nets to floating-point noise, not a real
-        # exposure, so judge sign relative to the gross gamma on the book
-        tol = 1e-6 * float(np.max(gross)) if gross.size else 0.0
-
-        net_spot = float(np.interp(spot, grid, net))
-        if net_spot > tol:
-            regime = "positive"
-        elif net_spot < -tol:
-            regime = "negative"
-        else:
-            regime = "flat"
-
-        flip = float("nan")
-        crossings = np.nonzero(np.diff(np.sign(net)) != 0)[0]
-        if crossings.size and np.max(np.abs(net)) > tol:
-            # pick the crossing whose interpolated spot is closest to current spot
-            best = float("nan")
-            for j in crossings:
-                a, b = net[j], net[j + 1]
-                if a == b:
-                    continue
-                x = grid[j] + (grid[j + 1] - grid[j]) * (-a) / (b - a)
-                if np.isnan(best) or abs(x - spot) < abs(best - spot):
-                    best = x
-            flip = best
-
+        spot = float(grp["underlying_price"].iloc[0])
         dist = (flip / spot - 1.0) * 100.0 if not np.isnan(flip) else float("nan")
         rows.append(
             {

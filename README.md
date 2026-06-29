@@ -131,6 +131,9 @@ oc.plot.term_structure(enriched)
 
 # Per-expiry bid-ask spread, so you can see which tenors are worth working
 oc.plot.liquidity(enriched)
+
+# Net dealer gamma profile with the flip level marked (nearest expiry by default)
+oc.plot.gamma_profile(enriched)
 ```
 
 ## Positioning & flow analytics

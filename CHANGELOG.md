@@ -8,6 +8,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- `plot.gamma_profile` draws the net dealer gamma curve for one expiry across
+  the same spot grid `gamma_flip` scans, marking the current spot and the flip
+  level and shading the price-dampening vs amplifying regions. Defaults to the
+  nearest expiry. The scan is factored into a shared helper so the plot and the
+  flip table always agree.
 - `delta_exposure` returns per-expiry dealer delta exposure (DEX) - the
   directional sibling of `gamma_exposure`. `call_dex`/`put_dex`/`net_dex` from
   `sign * delta * open_interest * contract_size * S` under the long-call,

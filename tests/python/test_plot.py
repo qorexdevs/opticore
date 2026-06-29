@@ -313,3 +313,70 @@ class TestTermStructure:
     def test_empty_raises(self):
         with pytest.raises(ValueError, match="No term-structure data"):
             oc_plot.term_structure(pd.DataFrame())
+
+
+class TestGammaProfile:
+    """Test oc.plot.gamma_profile()."""
+
+    @pytest.fixture
+    def gamma_chain(self):
+        # puts piled low, calls piled high -> net dealer GEX crosses zero in the
+        # middle, so the profile has a real flip level to mark.
+        strikes = np.linspace(85.0, 115.0, 11)
+        rows = []
+        for exp, tte in [
+            (pd.Timestamp("2026-05-01", tz="UTC"), 30 / 365.25),
+            (pd.Timestamp("2026-07-01", tz="UTC"), 90 / 365.25),
+        ]:
+            for k in strikes:
+                for kind in ("call", "put"):
+                    if kind == "call":
+                        oi = 2000 if k >= 100.0 else 50
+                    else:
+                        oi = 2000 if k <= 100.0 else 50
+                    rows.append(
+                        {
+                            "strike": float(k),
+                            "expiry": exp,
+                            "kind": kind,
+                            "iv": 0.20,
+                            "tte": tte,
+                            "open_interest": oi,
+                            "underlying_price": 100.0,
+                        }
+                    )
+        return pd.DataFrame(rows)
+
+    def test_returns_fig_ax_tuple(self, gamma_chain):
+        import matplotlib.axes
+        import matplotlib.figure
+
+        fig, ax = oc_plot.gamma_profile(gamma_chain)
+        assert isinstance(fig, matplotlib.figure.Figure)
+        assert isinstance(ax, matplotlib.axes.Axes)
+
+    def test_marks_spot_and_flip(self, gamma_chain):
+        _, ax = oc_plot.gamma_profile(gamma_chain)
+        labels = [t.get_text() for t in ax.get_legend().get_texts()]
+        assert any("Spot" in s for s in labels)
+        assert any("Flip" in s for s in labels)  # skewed book crosses zero
+
+    def test_nearest_expiry_default(self, gamma_chain):
+        _, ax = oc_plot.gamma_profile(gamma_chain)
+        assert "2026-05-01" in ax.get_title()  # soonest expiry
+
+    def test_explicit_expiry(self, gamma_chain):
+        _, ax = oc_plot.gamma_profile(gamma_chain, expiry="2026-07-01")
+        assert "2026-07-01" in ax.get_title()
+
+    def test_custom_ax(self, gamma_chain):
+        import matplotlib.pyplot as plt
+
+        fig, ax = plt.subplots()
+        out_fig, out_ax = oc_plot.gamma_profile(gamma_chain, ax=ax)
+        assert out_fig is fig
+        assert out_ax is ax
+
+    def test_missing_columns_raises(self):
+        with pytest.raises(ValueError, match="missing columns"):
+            oc_plot.gamma_profile(pd.DataFrame({"kind": ["call"]}))
