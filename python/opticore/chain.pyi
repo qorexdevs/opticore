@@ -170,6 +170,10 @@ def delta_exposure(
     chain: pd.DataFrame,
     contract_size: float = ...,
 ) -> pd.DataFrame: ...
+def delta_exposure_by_strike(
+    chain: pd.DataFrame,
+    contract_size: float = ...,
+) -> pd.DataFrame: ...
 def gamma_exposure(
     chain: pd.DataFrame,
     contract_size: float = ...,
@@ -185,4 +189,8 @@ def gamma_flip(
     contract_size: float = ...,
     spot_range: float = ...,
     n_points: int = ...,
+) -> pd.DataFrame: ...
+def vega_exposure(
+    chain: pd.DataFrame,
+    contract_size: float = ...,
 ) -> pd.DataFrame: ...

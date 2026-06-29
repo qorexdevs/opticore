@@ -2370,6 +2370,72 @@ class TestGammaExposureByStrike:
         assert callable(oc.gamma_exposure_by_strike)
 
 
+class TestVegaExposure:
+    def _enriched(self, **kw):
+        return oc.enrich(_synthetic_chain(**kw), rate=0.05)
+
+    def test_returns_expected_columns(self):
+        out = oc.vega_exposure(self._enriched(expiry_days=(30,)))
+        for col in (
+            "expiry",
+            "underlying_price",
+            "call_vex",
+            "put_vex",
+            "net_vex",
+            "vega_wall_strike",
+        ):
+            assert col in out.columns
+
+    def test_one_row_per_expiry_sorted(self):
+        out = oc.vega_exposure(self._enriched(expiry_days=(120, 30, 60)))
+        assert len(out) == 3
+        assert list(out["expiry"]) == sorted(out["expiry"])
+
+    def test_call_vex_positive_put_vex_negative(self):
+        # vega is positive for both sides, so the call leg adds and the put leg
+        # subtracts under the long-call / short-put convention.
+        r = oc.vega_exposure(self._enriched(expiry_days=(30,))).iloc[0]
+        assert r["call_vex"] > 0
+        assert r["put_vex"] < 0
+
+    def test_symmetric_book_nets_near_zero(self):
+        r = oc.vega_exposure(self._enriched(expiry_days=(30,))).iloc[0]
+        assert r["net_vex"] == pytest.approx(0.0, abs=abs(r["call_vex"]) * 1e-6)
+
+    def test_call_heavy_book_has_positive_net(self):
+        chain = self._enriched(expiry_days=(30,))
+        chain.loc[chain["kind"] == "call", "open_interest"] *= 3
+        r = oc.vega_exposure(chain).iloc[0]
+        assert r["net_vex"] > 0
+
+    def test_vega_wall_near_atm(self):
+        # vega peaks at-the-money, so the gross-vega wall sits at the strike
+        # closest to spot (100 with the 85..115 grid)
+        chain = self._enriched(underlying=100.0, expiry_days=(30,), n_strikes=11)
+        r = oc.vega_exposure(chain).iloc[0]
+        assert r["vega_wall_strike"] == pytest.approx(100.0)
+
+    def test_scales_with_contract_size(self):
+        chain = self._enriched(expiry_days=(30,))
+        base = oc.vega_exposure(chain, contract_size=100.0).iloc[0]["call_vex"]
+        doubled = oc.vega_exposure(chain, contract_size=200.0).iloc[0]["call_vex"]
+        assert doubled == pytest.approx(2.0 * base)
+
+    def test_no_vega_column_returns_empty(self):
+        out = oc.vega_exposure(_synthetic_chain(expiry_days=(30,)))
+        assert out.empty
+        assert "vega_wall_strike" in out.columns
+
+    def test_zero_oi_expiry_skipped(self):
+        chain = self._enriched(expiry_days=(30,))
+        chain["open_interest"] = 0
+        assert oc.vega_exposure(chain).empty
+
+    def test_in_public_api(self):
+        assert hasattr(oc, "vega_exposure")
+        assert callable(oc.vega_exposure)
+
+
 class TestGammaFlip:
     def _enriched(self, **kw):
         return oc.enrich(_synthetic_chain(**kw), rate=0.05)

@@ -8,6 +8,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- `vega_exposure` returns per-expiry dealer vega exposure (VEX) - the volatility
+  sibling of `delta_exposure` and `gamma_exposure`. `call_vex`/`put_vex`/`net_vex`
+  from `sign * vega * open_interest * contract_size` under the long-call,
+  short-put convention (vega is already per 1% vol move), plus a
+  `vega_wall_strike` on the gross-vega peak. Positive net VEX means the writing
+  side carries long vega and gains when implied vol rises.
 - `delta_exposure_by_strike` returns the per-strike DEX profile behind
   `delta_exposure` - `call_dex`/`put_dex`/`net_dex` per strike plus a
   `cumulative_net_dex` running up the board and an `is_delta_wall` flag on the
