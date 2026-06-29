@@ -380,3 +380,78 @@ class TestGammaProfile:
     def test_missing_columns_raises(self):
         with pytest.raises(ValueError, match="missing columns"):
             oc_plot.gamma_profile(pd.DataFrame({"kind": ["call"]}))
+
+
+class TestExposureProfile:
+    """Test oc.plot.exposure_profile()."""
+
+    @pytest.fixture
+    def greek_chain(self):
+        # open interest peaks at 100 so there's a clear exposure wall; greeks
+        # carry delta/gamma/vega so the same chain serves all three profiles.
+        strikes = np.linspace(90.0, 110.0, 11)
+        rows = []
+        for exp in (
+            pd.Timestamp("2026-05-01", tz="UTC"),
+            pd.Timestamp("2026-07-01", tz="UTC"),
+        ):
+            for k in strikes:
+                for kind in ("call", "put"):
+                    oi = 3000 if k == 100.0 else 200
+                    rows.append(
+                        {
+                            "strike": float(k),
+                            "expiry": exp,
+                            "kind": kind,
+                            "underlying_price": 100.0,
+                            "open_interest": oi,
+                            "delta": 0.5 if kind == "call" else -0.5,
+                            "gamma": 0.04,
+                            "vega": 0.18,
+                        }
+                    )
+        return pd.DataFrame(rows)
+
+    def test_returns_fig_ax_tuple(self, greek_chain):
+        import matplotlib.axes
+        import matplotlib.figure
+
+        fig, ax = oc_plot.exposure_profile(greek_chain)
+        assert isinstance(fig, matplotlib.figure.Figure)
+        assert isinstance(ax, matplotlib.axes.Axes)
+
+    def test_marks_spot_and_wall(self, greek_chain):
+        _, ax = oc_plot.exposure_profile(greek_chain)
+        labels = [t.get_text() for t in ax.get_legend().get_texts()]
+        assert any("Spot" in s for s in labels)
+        assert any("Wall" in s for s in labels)
+
+    def test_each_greek_labels_axis(self, greek_chain):
+        for greek, tag in (("delta", "DEX"), ("gamma", "GEX"), ("vega", "VEX")):
+            _, ax = oc_plot.exposure_profile(greek_chain, greek=greek)
+            assert tag in ax.get_ylabel()
+            assert tag in ax.get_title()
+
+    def test_nearest_expiry_default(self, greek_chain):
+        _, ax = oc_plot.exposure_profile(greek_chain)
+        assert "2026-05-01" in ax.get_title()  # soonest expiry
+
+    def test_explicit_expiry(self, greek_chain):
+        _, ax = oc_plot.exposure_profile(greek_chain, expiry="2026-07-01")
+        assert "2026-07-01" in ax.get_title()
+
+    def test_custom_ax(self, greek_chain):
+        import matplotlib.pyplot as plt
+
+        fig, ax = plt.subplots()
+        out_fig, out_ax = oc_plot.exposure_profile(greek_chain, ax=ax)
+        assert out_fig is fig
+        assert out_ax is ax
+
+    def test_invalid_greek_raises(self, greek_chain):
+        with pytest.raises(ValueError, match="greek must be one of"):
+            oc_plot.exposure_profile(greek_chain, greek="theta")
+
+    def test_empty_raises(self):
+        with pytest.raises(ValueError, match="No GEX data"):
+            oc_plot.exposure_profile(pd.DataFrame())

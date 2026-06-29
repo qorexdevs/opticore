@@ -134,6 +134,9 @@ oc.plot.liquidity(enriched)
 
 # Net dealer gamma profile with the flip level marked (nearest expiry by default)
 oc.plot.gamma_profile(enriched)
+
+# Per-strike dealer exposure (delta/gamma/vega) with the wall and spot marked
+oc.plot.exposure_profile(enriched, greek="gamma")
 ```
 
 ## Positioning & flow analytics

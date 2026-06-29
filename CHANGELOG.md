@@ -8,6 +8,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- `plot.exposure_profile` charts per-strike dealer exposure for one expiry -
+  call and put bars at each strike, net exposure overlaid as a line, and the
+  exposure wall and current spot marked. `greek="delta"|"gamma"|"vega"` reads
+  the matching `*_exposure_by_strike` table, so the by-strike profiles now have
+  a plot the way `gamma_profile` plots the spot sweep. Defaults to the nearest
+  expiry like `plot.smile`.
 - `vega_exposure_by_strike` returns the per-strike VEX profile behind
   `vega_exposure` - `call_vex`/`put_vex`/`net_vex` per strike plus a
   `cumulative_net_vex` running up the board and an `is_vega_wall` flag on the

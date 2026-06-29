@@ -505,3 +505,120 @@ def gamma_profile(
 
     fig.tight_layout()
     return fig, ax
+
+
+# greek -> (by-strike function, column suffix, wall flag column, label tag)
+_EXPOSURE_BY_STRIKE = {
+    "delta": ("delta_exposure_by_strike", "dex", "is_delta_wall", "DEX"),
+    "gamma": ("gamma_exposure_by_strike", "gex", "is_gamma_wall", "GEX"),
+    "vega": ("vega_exposure_by_strike", "vex", "is_vega_wall", "VEX"),
+}
+
+
+def exposure_profile(
+    chain,
+    greek: str = "gamma",
+    expiry=None,
+    contract_size: float = 100.0,
+    ax=None,
+):
+    """Plot per-strike dealer exposure (DEX / GEX / VEX) for one expiry.
+
+    Where ``gamma_profile`` sweeps net GEX across a spot grid, this charts the
+    strike axis instead: call and put exposure as bars at each strike, net
+    exposure overlaid as a line, and markers for the exposure wall (the strike
+    carrying the most gross dollar greek) and the current spot. ``greek`` picks
+    the profile -- ``'delta'``, ``'gamma'`` or ``'vega'`` -- read from the
+    matching ``*_exposure_by_strike`` table. Defaults to the nearest expiry;
+    pass ``expiry`` to pick another, like ``oc.plot.smile``.
+
+    Parameters
+    ----------
+    chain : pd.DataFrame
+        An enriched chain (see ``oc.enrich``); needs ``kind``, ``open_interest``,
+        ``strike``, ``underlying_price`` and the greek column the profile reads
+        (``delta`` / ``gamma`` / ``vega``).
+    greek : str
+        Which exposure to plot: 'delta', 'gamma', or 'vega' (default: 'gamma').
+    expiry : str, pd.Timestamp, or None
+        Expiry to plot. If None, the nearest (soonest) expiry is used.
+    contract_size : float
+        Shares per contract, passed through to the exposure table (default: 100).
+    ax : matplotlib.axes.Axes or None
+        Axes to plot on. If None, creates a new figure.
+
+    Returns
+    -------
+    (fig, ax) : tuple[matplotlib.figure.Figure, matplotlib.axes.Axes]
+        Standard matplotlib convention.
+    """
+    plt = _get_plt()
+    import pandas as pd
+
+    from opticore import chain as oc_chain
+
+    key = greek.lower()
+    if key not in _EXPOSURE_BY_STRIKE:
+        raise ValueError(f"greek must be one of {sorted(_EXPOSURE_BY_STRIKE)}, got: {greek!r}")
+    fn_name, suf, wall_col, tag = _EXPOSURE_BY_STRIKE[key]
+
+    prof = getattr(oc_chain, fn_name)(chain, contract_size=contract_size)
+    if prof.empty:
+        raise ValueError(f"No {tag} data to plot after filtering.")
+
+    if expiry is not None:
+        target = pd.to_datetime(expiry, utc=True).normalize()
+        exp_norm = pd.to_datetime(prof["expiry"], utc=True).dt.normalize()
+        grp = prof[exp_norm == target]
+        if grp.empty:
+            raise ValueError(f"No rows for expiry {expiry!r}.")
+        label = pd.Timestamp(target).strftime("%Y-%m-%d")
+    else:
+        # nearest = soonest expiry
+        nearest = prof["expiry"].iloc[
+            int(pd.to_datetime(prof["expiry"], utc=True).to_numpy().argmin())
+        ]
+        grp = prof[prof["expiry"] == nearest]
+        label = (
+            pd.Timestamp(nearest).strftime("%Y-%m-%d")
+            if hasattr(nearest, "strftime")
+            else str(nearest)
+        )
+
+    grp = grp.sort_values("strike")
+    strikes = grp["strike"].to_numpy()
+    call = grp[f"call_{suf}"].to_numpy()
+    put = grp[f"put_{suf}"].to_numpy()
+    net = grp[f"net_{suf}"].to_numpy()
+    spot = float(grp["underlying_price"].iloc[0])
+    walls = grp.loc[grp[wall_col].astype(bool), "strike"]
+    wall = float(walls.iloc[0]) if not walls.empty else float("nan")
+
+    if ax is None:
+        fig, ax = plt.subplots(1, 1, figsize=(10, 6))
+    else:
+        fig = ax.get_figure()
+
+    # bar width off the median strike gap so spacing reads on any grid
+    gaps = np.diff(strikes)
+    width = (float(np.median(gaps)) if gaps.size else 1.0) * 0.4
+    ax.axhline(0, color="gray", linewidth=1, alpha=0.6)
+    ax.bar(
+        strikes - width / 2, call, width=width, color="tab:green", alpha=0.7, label=f"call {tag}"
+    )
+    ax.bar(strikes + width / 2, put, width=width, color="tab:red", alpha=0.7, label=f"put {tag}")
+    ax.plot(
+        strikes, net, color="tab:blue", marker="o", markersize=3, linewidth=1.5, label=f"net {tag}"
+    )
+    ax.axvline(spot, color="black", linestyle="--", alpha=0.7, label=f"Spot ({spot:.2f})")
+    if not np.isnan(wall):
+        ax.axvline(wall, color="tab:purple", linestyle=":", linewidth=2, label=f"Wall ({wall:.2f})")
+
+    ax.set_xlabel("Strike")
+    ax.set_ylabel(f"Dealer {tag}")
+    ax.set_title(f"{tag} by Strike {label}")
+    ax.legend(fontsize=9)
+    ax.grid(True, axis="y", alpha=0.3)
+
+    fig.tight_layout()
+    return fig, ax

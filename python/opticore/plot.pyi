@@ -66,3 +66,10 @@ def gamma_profile(
     n_points: int = ...,
     ax: Axes | None = ...,
 ) -> tuple[Figure, Axes]: ...
+def exposure_profile(
+    chain: pd.DataFrame,
+    greek: str = ...,
+    expiry: str | pd.Timestamp | None = ...,
+    contract_size: float = ...,
+    ax: Axes | None = ...,
+) -> tuple[Figure, Axes]: ...
