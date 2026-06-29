@@ -170,6 +170,9 @@ One more reads the Greeks rather than raw counts, so it wants an enriched chain:
 ```python
 enriched = oc.enrich(chain, rate=0.05)
 
+# Dealer delta exposure: directional hedging lean from open interest
+oc.delta_exposure(enriched)  # => call_dex, put_dex, net_dex, delta_wall_strike
+
 # Dealer gamma exposure: where hedging flow dampens or amplifies moves
 oc.gamma_exposure(enriched)  # => call_gex, put_gex, net_gex, gamma_wall_strike
 oc.gamma_exposure_by_strike(enriched)  # => the GEX profile per strike, cumulative_net_gex brackets the flip

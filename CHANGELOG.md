@@ -8,6 +8,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- `delta_exposure` returns per-expiry dealer delta exposure (DEX) - the
+  directional sibling of `gamma_exposure`. `call_dex`/`put_dex`/`net_dex` from
+  `sign * delta * open_interest * contract_size * S` under the long-call,
+  short-put convention, plus a `delta_wall_strike` on the gross-delta peak.
 - `gamma_exposure_by_strike` returns the per-strike GEX profile behind
   `gamma_exposure` - `call_gex`/`put_gex`/`net_gex` per strike plus a
   `cumulative_net_gex` running up the board and an `is_gamma_wall` flag on the

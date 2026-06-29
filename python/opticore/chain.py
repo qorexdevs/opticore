@@ -2530,6 +2530,89 @@ def volume_walls(chain: pd.DataFrame) -> pd.DataFrame:
     return pd.DataFrame(rows, columns=cols)
 
 
+def delta_exposure(chain: pd.DataFrame, contract_size: float = 100.0) -> pd.DataFrame:
+    """Per-expiry dealer delta exposure (DEX) from open interest and Greeks.
+
+    The directional sibling of ``gamma_exposure``. Under the same dealer
+    convention - long call, short put - per option
+
+        dex_i = sign * delta_i * open_interest_i * contract_size * S
+
+    with ``sign = +1`` for calls and ``-1`` for puts and ``S`` the underlying
+    price. That is dollar delta: how many dollars of spot the writing side is net
+    long or short through these strikes. Positive net DEX means dealers carry long
+    deltas and lean to sell into strength; negative means they are short and buy
+    it. ``delta_wall_strike`` is the strike holding the most gross dollar delta
+    (both sides, sign ignored), where directional hedging concentrates.
+
+    Needs the ``delta`` column from ``enrich`` plus ``open_interest``. Rows with
+    NaN delta or no open interest contribute nothing; an expiry with no usable
+    delta is skipped.
+
+    Parameters
+    ----------
+    chain : pd.DataFrame
+        An enriched chain (see ``enrich``); needs ``delta`` and ``open_interest``.
+    contract_size : float
+        Shares per contract (default: 100).
+
+    Returns
+    -------
+    pd.DataFrame
+        Columns: expiry, underlying_price, call_dex, put_dex, net_dex,
+        delta_wall_strike. One row per expiry, sorted by expiry.
+    """
+    cols = [
+        "expiry",
+        "underlying_price",
+        "call_dex",
+        "put_dex",
+        "net_dex",
+        "delta_wall_strike",
+    ]
+    needed = {"kind", "delta", "open_interest", "strike", "underlying_price"}
+    if chain.empty or not needed.issubset(chain.columns):
+        return pd.DataFrame(columns=cols)
+
+    df = chain.copy()
+    df["_kind"] = (
+        df["kind"].str.lower().map({"call": "call", "c": "call", "put": "put", "p": "put"})
+    )
+    df = df.dropna(subset=["_kind", "delta", "open_interest", "strike"])
+    if df.empty:
+        return pd.DataFrame(columns=cols)
+
+    rows = []
+    for exp, grp in df.groupby("expiry", sort=True):
+        spot = float(grp["underlying_price"].iloc[0])
+        scale = contract_size * spot
+        sign = np.where(grp["_kind"].to_numpy() == "call", 1.0, -1.0)
+        dex = sign * grp["delta"].to_numpy() * grp["open_interest"].to_numpy() * scale
+        gross = np.abs(grp["delta"].to_numpy()) * grp["open_interest"].to_numpy() * scale
+        grp = grp.assign(_dex=dex, _gross=gross)
+        call_dex = float(grp.loc[grp["_kind"] == "call", "_dex"].sum())
+        put_dex = float(grp.loc[grp["_kind"] == "put", "_dex"].sum())
+
+        by_strike = grp.groupby("strike")["_gross"].sum().sort_index()
+        if (by_strike > 0).any():
+            wall = float(by_strike.idxmax())
+        else:
+            continue
+
+        rows.append(
+            {
+                "expiry": exp,
+                "underlying_price": spot,
+                "call_dex": call_dex,
+                "put_dex": put_dex,
+                "net_dex": call_dex + put_dex,
+                "delta_wall_strike": wall,
+            }
+        )
+
+    return pd.DataFrame(rows, columns=cols)
+
+
 def gamma_exposure(chain: pd.DataFrame, contract_size: float = 100.0) -> pd.DataFrame:
     """Per-expiry dealer gamma exposure (GEX) from open interest and Greeks.
 

@@ -166,6 +166,10 @@ def volume_profile(
 def volume_walls(
     chain: pd.DataFrame,
 ) -> pd.DataFrame: ...
+def delta_exposure(
+    chain: pd.DataFrame,
+    contract_size: float = ...,
+) -> pd.DataFrame: ...
 def gamma_exposure(
     chain: pd.DataFrame,
     contract_size: float = ...,

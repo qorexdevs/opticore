@@ -2112,6 +2112,64 @@ def test_strangle_in_public_api():
     assert callable(oc.strangle)
 
 
+class TestDeltaExposure:
+    def _enriched(self, **kw):
+        return oc.enrich(_synthetic_chain(**kw), rate=0.05)
+
+    def test_returns_expected_columns(self):
+        out = oc.delta_exposure(self._enriched(expiry_days=(30,)))
+        for col in (
+            "expiry",
+            "underlying_price",
+            "call_dex",
+            "put_dex",
+            "net_dex",
+            "delta_wall_strike",
+        ):
+            assert col in out.columns
+
+    def test_one_row_per_expiry_sorted(self):
+        out = oc.delta_exposure(self._enriched(expiry_days=(120, 30, 60)))
+        assert len(out) == 3
+        assert list(out["expiry"]) == sorted(out["expiry"])
+
+    def test_long_call_short_put_both_positive(self):
+        # call delta is positive and put delta negative; under the long-call /
+        # short-put convention both legs add positive dollar delta, so the book
+        # reads net long.
+        r = oc.delta_exposure(self._enriched(expiry_days=(30,))).iloc[0]
+        assert r["call_dex"] > 0
+        assert r["put_dex"] > 0
+        assert r["net_dex"] == pytest.approx(r["call_dex"] + r["put_dex"])
+
+    def test_call_heavy_book_lifts_net(self):
+        chain = self._enriched(expiry_days=(30,))
+        base = oc.delta_exposure(chain).iloc[0]["net_dex"]
+        chain.loc[chain["kind"] == "call", "open_interest"] *= 3
+        assert oc.delta_exposure(chain).iloc[0]["net_dex"] > base
+
+    def test_delta_wall_within_grid(self):
+        chain = self._enriched(underlying=100.0, expiry_days=(30,), n_strikes=11)
+        r = oc.delta_exposure(chain).iloc[0]
+        assert 85.0 <= r["delta_wall_strike"] <= 115.0
+
+    def test_scales_with_contract_size(self):
+        chain = self._enriched(expiry_days=(30,))
+        base = oc.delta_exposure(chain, contract_size=100.0).iloc[0]["call_dex"]
+        doubled = oc.delta_exposure(chain, contract_size=200.0).iloc[0]["call_dex"]
+        assert doubled == pytest.approx(2.0 * base)
+
+    def test_no_delta_column_returns_empty(self):
+        out = oc.delta_exposure(_synthetic_chain(expiry_days=(30,)))
+        assert out.empty
+        assert "delta_wall_strike" in out.columns
+
+    def test_zero_oi_expiry_skipped(self):
+        chain = self._enriched(expiry_days=(30,))
+        chain["open_interest"] = 0
+        assert oc.delta_exposure(chain).empty
+
+
 class TestGammaExposure:
     def _enriched(self, **kw):
         return oc.enrich(_synthetic_chain(**kw), rate=0.05)
@@ -2345,6 +2403,11 @@ def test_volume_profile_in_public_api():
 def test_volume_walls_in_public_api():
     assert hasattr(oc, "volume_walls")
     assert callable(oc.volume_walls)
+
+
+def test_delta_exposure_in_public_api():
+    assert hasattr(oc, "delta_exposure")
+    assert callable(oc.delta_exposure)
 
 
 def test_gamma_exposure_in_public_api():
