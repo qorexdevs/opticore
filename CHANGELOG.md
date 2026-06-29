@@ -8,6 +8,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- `vega_exposure_by_strike` returns the per-strike VEX profile behind
+  `vega_exposure` - `call_vex`/`put_vex`/`net_vex` per strike plus a
+  `cumulative_net_vex` running up the board and an `is_vega_wall` flag on the
+  gross-vega peak. The volatility sibling of `delta_exposure_by_strike` and
+  `gamma_exposure_by_strike`, same `contract_size`-only scaling as the aggregate
+  so the columns sum back to it; the sign change in the cumulative column
+  brackets where net dealer vega flips.
 - `vega_exposure` returns per-expiry dealer vega exposure (VEX) - the volatility
   sibling of `delta_exposure` and `gamma_exposure`. `call_vex`/`put_vex`/`net_vex`
   from `sign * vega * open_interest * contract_size` under the long-call,

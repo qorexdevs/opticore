@@ -3128,3 +3128,94 @@ def vega_exposure(chain: pd.DataFrame, contract_size: float = 100.0) -> pd.DataF
         )
 
     return pd.DataFrame(rows, columns=cols)
+
+
+def vega_exposure_by_strike(chain: pd.DataFrame, contract_size: float = 100.0) -> pd.DataFrame:
+    """Per-strike dealer vega exposure, the profile behind ``vega_exposure``.
+
+    ``vega_exposure`` nets VEX to one row per expiry; this keeps the strike axis
+    the way ``gamma_exposure_by_strike`` does for GEX. For each expiry and strike
+    it returns ``call_vex``, ``put_vex``, ``net_vex`` and a ``cumulative_net_vex``
+    running up the strikes, plus ``is_vega_wall`` on the strike carrying the most
+    gross dollar vega. Charted against strike it's the VEX profile, and the sign
+    change in ``cumulative_net_vex`` brackets the strike where net dealer vega
+    flips.
+
+    Same scaling and NaN rules as ``vega_exposure``: per option
+    ``sign * vega * open_interest * contract_size`` with ``sign`` +1 for calls and
+    -1 for puts, and ``vega`` already per 1% vol move (no spot scaling, unlike
+    GEX). Rows with NaN vega or no open interest contribute nothing; an expiry
+    with no usable vega is skipped.
+
+    Parameters
+    ----------
+    chain : pd.DataFrame
+        An enriched chain (see ``enrich``); needs ``vega`` and ``open_interest``.
+    contract_size : float
+        Shares per contract (default: 100).
+
+    Returns
+    -------
+    pd.DataFrame
+        Columns: expiry, underlying_price, strike, call_vex, put_vex, net_vex,
+        cumulative_net_vex, is_vega_wall. One row per (expiry, strike), sorted by
+        expiry then strike.
+    """
+    cols = [
+        "expiry",
+        "underlying_price",
+        "strike",
+        "call_vex",
+        "put_vex",
+        "net_vex",
+        "cumulative_net_vex",
+        "is_vega_wall",
+    ]
+    needed = {"kind", "vega", "open_interest", "strike", "underlying_price"}
+    if chain.empty or not needed.issubset(chain.columns):
+        return pd.DataFrame(columns=cols)
+
+    df = chain.copy()
+    df["_kind"] = (
+        df["kind"].str.lower().map({"call": "call", "c": "call", "put": "put", "p": "put"})
+    )
+    df = df.dropna(subset=["_kind", "vega", "open_interest", "strike"])
+    if df.empty:
+        return pd.DataFrame(columns=cols)
+
+    rows = []
+    for exp, grp in df.groupby("expiry", sort=True):
+        spot = float(grp["underlying_price"].iloc[0])
+        sign = np.where(grp["_kind"].to_numpy() == "call", 1.0, -1.0)
+        grp = grp.assign(
+            _vex=sign * grp["vega"].to_numpy() * grp["open_interest"].to_numpy() * contract_size,
+            _gross=np.abs(grp["vega"].to_numpy()) * grp["open_interest"].to_numpy() * contract_size,
+        )
+        gross_by_strike = grp.groupby("strike")["_gross"].sum()
+        if not (gross_by_strike > 0).any():
+            continue
+        wall = float(gross_by_strike.idxmax())
+
+        call_vex = grp.loc[grp["_kind"] == "call"].groupby("strike")["_vex"].sum()
+        put_vex = grp.loc[grp["_kind"] == "put"].groupby("strike")["_vex"].sum()
+
+        cum = 0.0
+        for s in np.sort(grp["strike"].unique()):
+            c = float(call_vex.get(s, 0.0))
+            p = float(put_vex.get(s, 0.0))
+            net = c + p
+            cum += net
+            rows.append(
+                {
+                    "expiry": exp,
+                    "underlying_price": spot,
+                    "strike": float(s),
+                    "call_vex": c,
+                    "put_vex": p,
+                    "net_vex": net,
+                    "cumulative_net_vex": cum,
+                    "is_vega_wall": float(s) == wall,
+                }
+            )
+
+    return pd.DataFrame(rows, columns=cols)

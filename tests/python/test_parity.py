@@ -2370,6 +2370,79 @@ class TestGammaExposureByStrike:
         assert callable(oc.gamma_exposure_by_strike)
 
 
+class TestVegaExposureByStrike:
+    def _enriched(self, **kw):
+        return oc.enrich(_synthetic_chain(**kw), rate=0.05)
+
+    def test_returns_expected_columns(self):
+        out = oc.vega_exposure_by_strike(self._enriched(expiry_days=(30,)))
+        for col in (
+            "expiry",
+            "underlying_price",
+            "strike",
+            "call_vex",
+            "put_vex",
+            "net_vex",
+            "cumulative_net_vex",
+            "is_vega_wall",
+        ):
+            assert col in out.columns
+
+    def test_one_row_per_strike_sorted(self):
+        out = oc.vega_exposure_by_strike(self._enriched(expiry_days=(30,), n_strikes=11))
+        assert len(out) == 11
+        assert list(out["strike"]) == sorted(out["strike"])
+
+    def test_rows_sorted_by_expiry_then_strike(self):
+        out = oc.vega_exposure_by_strike(self._enriched(expiry_days=(60, 30), n_strikes=5))
+        assert len(out) == 10
+        for _, grp in out.groupby("expiry"):
+            assert list(grp["strike"]) == sorted(grp["strike"])
+        assert list(out["expiry"]) == sorted(out["expiry"])
+
+    def test_net_sums_to_aggregate(self):
+        # collapsing the profile back over strikes must reproduce vega_exposure
+        chain = self._enriched(expiry_days=(30,))
+        chain.loc[chain["kind"] == "call", "open_interest"] *= 3
+        agg = oc.vega_exposure(chain).iloc[0]
+        prof = oc.vega_exposure_by_strike(chain)
+        assert prof["net_vex"].sum() == pytest.approx(agg["net_vex"])
+        assert prof["call_vex"].sum() == pytest.approx(agg["call_vex"])
+        assert prof["put_vex"].sum() == pytest.approx(agg["put_vex"])
+
+    def test_call_positive_put_negative_per_strike(self):
+        prof = oc.vega_exposure_by_strike(self._enriched(expiry_days=(30,)))
+        assert (prof["call_vex"] >= 0).all()
+        assert (prof["put_vex"] <= 0).all()
+
+    def test_cumulative_is_running_sum(self):
+        prof = oc.vega_exposure_by_strike(self._enriched(expiry_days=(30,), n_strikes=11))
+        assert list(prof["cumulative_net_vex"]) == pytest.approx(list(prof["net_vex"].cumsum()))
+        assert prof["cumulative_net_vex"].iloc[-1] == pytest.approx(prof["net_vex"].sum())
+
+    def test_one_wall_per_expiry_matches_aggregate(self):
+        chain = self._enriched(underlying=100.0, expiry_days=(30,), n_strikes=11)
+        prof = oc.vega_exposure_by_strike(chain)
+        walls = prof[prof["is_vega_wall"]]
+        assert len(walls) == 1
+        agg_wall = oc.vega_exposure(chain).iloc[0]["vega_wall_strike"]
+        assert walls.iloc[0]["strike"] == pytest.approx(agg_wall)
+
+    def test_no_vega_column_returns_empty(self):
+        out = oc.vega_exposure_by_strike(_synthetic_chain(expiry_days=(30,)))
+        assert out.empty
+        assert "cumulative_net_vex" in out.columns
+
+    def test_zero_oi_expiry_skipped(self):
+        chain = self._enriched(expiry_days=(30,))
+        chain["open_interest"] = 0
+        assert oc.vega_exposure_by_strike(chain).empty
+
+    def test_in_public_api(self):
+        assert hasattr(oc, "vega_exposure_by_strike")
+        assert callable(oc.vega_exposure_by_strike)
+
+
 class TestVegaExposure:
     def _enriched(self, **kw):
         return oc.enrich(_synthetic_chain(**kw), rate=0.05)

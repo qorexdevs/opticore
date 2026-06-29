@@ -194,3 +194,7 @@ def vega_exposure(
     chain: pd.DataFrame,
     contract_size: float = ...,
 ) -> pd.DataFrame: ...
+def vega_exposure_by_strike(
+    chain: pd.DataFrame,
+    contract_size: float = ...,
+) -> pd.DataFrame: ...
