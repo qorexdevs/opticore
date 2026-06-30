@@ -2,9 +2,8 @@
 
 **High-performance options pricing, IV solver, and Greeks — C++20 core with a Pythonic API.**
 
-[![PyPI](https://img.shields.io/pypi/v/opticore.svg)](https://pypi.org/project/opticore/)
-[![Python](https://img.shields.io/pypi/pyversions/opticore.svg)](https://pypi.org/project/opticore/)
-[![Downloads](https://static.pepy.tech/badge/opticore/month)](https://pepy.tech/project/opticore)
+[![Release](https://img.shields.io/github/v/release/qorexdevs/opticore?sort=semver)](https://github.com/qorexdevs/opticore/releases)
+[![Python](https://img.shields.io/badge/python-3.10%E2%80%933.13-blue.svg)](https://github.com/qorexdevs/opticore/releases)
 [![CI](https://github.com/qorexdevs/opticore/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/qorexdevs/opticore/actions/workflows/ci.yml)
 [![Docs](https://img.shields.io/badge/docs-pdoc-blue.svg)](https://qorexdevs.github.io/opticore/)
 [![codecov](https://codecov.io/gh/qorexdevs/opticore/branch/main/graph/badge.svg)](https://codecov.io/gh/qorexdevs/opticore)
@@ -17,7 +16,7 @@
 
 | | OptiCore | QuantLib | py_vollib | FinancePy |
 |---|---------|----------|-----------|-----------|
-| **Install** | `pip install opticore` | Compile from source + SWIG | `pip install` | `pip install` |
+| **Install** | Prebuilt wheels, no source build | Compile from source + SWIG | `pip install` | `pip install` |
 | **Price 10k options** | 0.65 ms* | ~50 ms | 40 ms* | ~100 ms |
 | **IV precision** | 64-bit machine ε | 1e-8 | 64-bit (with Numba) | 1e-6 |
 | **API style** | `oc.price(spot=100, ...)` | 15 lines of boilerplate | Function-based | OOP |
@@ -29,8 +28,12 @@
 
 ## Quickstart
 
+Not on PyPI yet. Grab a prebuilt wheel (cp310-cp313, Linux/macOS/Windows) from the
+[releases page](https://github.com/qorexdevs/opticore/releases), or build from source
+(needs a C++20 compiler and CMake):
+
 ```bash
-pip install opticore
+pip install git+https://github.com/qorexdevs/opticore
 ```
 
 ```python
@@ -194,11 +197,13 @@ oc.vega_exposure_by_strike(enriched)  # => the VEX profile per strike, cumulativ
 
 ## Installation Options
 
+Until the PyPI release, install from git (swap the extras in the brackets):
+
 ```bash
-pip install opticore          # Core: pricing, IV, Greeks (requires: numpy, pandas)
-pip install opticore[ibkr]    # + Interactive Brokers data
-pip install opticore[viz]     # + matplotlib plotting
-pip install opticore[all]     # Everything
+pip install "git+https://github.com/qorexdevs/opticore"          # Core: pricing, IV, Greeks (requires: numpy, pandas)
+pip install "opticore[ibkr] @ git+https://github.com/qorexdevs/opticore"  # + Interactive Brokers data
+pip install "opticore[viz]  @ git+https://github.com/qorexdevs/opticore"  # + matplotlib plotting
+pip install "opticore[all]  @ git+https://github.com/qorexdevs/opticore"  # Everything
 ```
 
 ## How It Works
