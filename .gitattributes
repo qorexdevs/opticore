@@ -1,0 +1,3 @@
+# tutorial notebooks are docs, not the core - keep them out of the language stats
+notebooks/** linguist-documentation
+*.ipynb linguist-documentation
