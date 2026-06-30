@@ -3301,3 +3301,96 @@ def theta_exposure(chain: pd.DataFrame, contract_size: float = 100.0) -> pd.Data
         )
 
     return pd.DataFrame(rows, columns=cols)
+
+
+def theta_exposure_by_strike(chain: pd.DataFrame, contract_size: float = 100.0) -> pd.DataFrame:
+    """Per-strike dealer theta exposure, the profile behind ``theta_exposure``.
+
+    ``theta_exposure`` nets TEX to one row per expiry; this keeps the strike axis
+    like ``vega_exposure_by_strike`` does for VEX. For each expiry and strike it
+    returns ``call_tex``, ``put_tex``, ``net_tex`` and a ``cumulative_net_tex``
+    running up the strikes, plus ``is_theta_wall`` on the strike carrying the most
+    gross dollar theta. Charted against strike it's the TEX profile, peaking near
+    the money where theta is largest, and the sign change in ``cumulative_net_tex``
+    brackets the strike where net dealer theta flips.
+
+    Same scaling and NaN rules as ``theta_exposure``: per option
+    ``sign * theta * open_interest * contract_size`` with ``sign`` +1 for calls and
+    -1 for puts, and ``theta`` already the per-day decay (no spot scaling, unlike
+    GEX). Rows with NaN theta or no open interest contribute nothing; an expiry
+    with no usable theta is skipped.
+
+    Parameters
+    ----------
+    chain : pd.DataFrame
+        An enriched chain (see ``enrich``); needs ``theta`` and ``open_interest``.
+    contract_size : float
+        Shares per contract (default: 100).
+
+    Returns
+    -------
+    pd.DataFrame
+        Columns: expiry, underlying_price, strike, call_tex, put_tex, net_tex,
+        cumulative_net_tex, is_theta_wall. One row per (expiry, strike), sorted by
+        expiry then strike.
+    """
+    cols = [
+        "expiry",
+        "underlying_price",
+        "strike",
+        "call_tex",
+        "put_tex",
+        "net_tex",
+        "cumulative_net_tex",
+        "is_theta_wall",
+    ]
+    needed = {"kind", "theta", "open_interest", "strike", "underlying_price"}
+    if chain.empty or not needed.issubset(chain.columns):
+        return pd.DataFrame(columns=cols)
+
+    df = chain.copy()
+    df["_kind"] = (
+        df["kind"].str.lower().map({"call": "call", "c": "call", "put": "put", "p": "put"})
+    )
+    df = df.dropna(subset=["_kind", "theta", "open_interest", "strike"])
+    if df.empty:
+        return pd.DataFrame(columns=cols)
+
+    rows = []
+    for exp, grp in df.groupby("expiry", sort=True):
+        spot = float(grp["underlying_price"].iloc[0])
+        sign = np.where(grp["_kind"].to_numpy() == "call", 1.0, -1.0)
+        grp = grp.assign(
+            _tex=sign * grp["theta"].to_numpy() * grp["open_interest"].to_numpy() * contract_size,
+            _gross=np.abs(grp["theta"].to_numpy())
+            * grp["open_interest"].to_numpy()
+            * contract_size,
+        )
+        gross_by_strike = grp.groupby("strike")["_gross"].sum()
+        if not (gross_by_strike > 0).any():
+            continue
+        wall = float(gross_by_strike.idxmax())
+
+        call_tex = grp.loc[grp["_kind"] == "call"].groupby("strike")["_tex"].sum()
+        put_tex = grp.loc[grp["_kind"] == "put"].groupby("strike")["_tex"].sum()
+
+        cum = 0.0
+        for s in np.sort(grp["strike"].unique()):
+            c = float(call_tex.get(s, 0.0))
+            p = float(put_tex.get(s, 0.0))
+            net = c + p
+            cum += net
+            rows.append(
+                {
+                    "expiry": exp,
+                    "underlying_price": spot,
+                    "strike": float(s),
+                    "call_tex": c,
+                    "put_tex": p,
+                    "net_tex": net,
+                    "cumulative_net_tex": cum,
+                    "is_theta_wall": float(s) == wall,
+                }
+            )
+
+    return pd.DataFrame(rows, columns=cols)

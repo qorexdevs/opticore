@@ -2567,6 +2567,82 @@ class TestThetaExposure:
         assert callable(oc.theta_exposure)
 
 
+class TestThetaExposureByStrike:
+    def _enriched(self, **kw):
+        return oc.enrich(_synthetic_chain(**kw), rate=0.05)
+
+    def test_returns_expected_columns(self):
+        out = oc.theta_exposure_by_strike(self._enriched(expiry_days=(30,)))
+        for col in (
+            "expiry",
+            "underlying_price",
+            "strike",
+            "call_tex",
+            "put_tex",
+            "net_tex",
+            "cumulative_net_tex",
+            "is_theta_wall",
+        ):
+            assert col in out.columns
+
+    def test_one_row_per_strike_sorted(self):
+        out = oc.theta_exposure_by_strike(self._enriched(expiry_days=(30,), n_strikes=11))
+        assert len(out) == 11
+        assert list(out["strike"]) == sorted(out["strike"])
+
+    def test_rows_sorted_by_expiry_then_strike(self):
+        out = oc.theta_exposure_by_strike(self._enriched(expiry_days=(60, 30), n_strikes=5))
+        assert len(out) == 10
+        for _, grp in out.groupby("expiry"):
+            assert list(grp["strike"]) == sorted(grp["strike"])
+        assert list(out["expiry"]) == sorted(out["expiry"])
+
+    def test_net_sums_to_aggregate(self):
+        # collapsing the profile back over strikes must reproduce theta_exposure
+        chain = self._enriched(expiry_days=(30,))
+        chain.loc[chain["kind"] == "call", "open_interest"] *= 3
+        agg = oc.theta_exposure(chain).iloc[0]
+        prof = oc.theta_exposure_by_strike(chain)
+        assert prof["net_tex"].sum() == pytest.approx(agg["net_tex"])
+        assert prof["call_tex"].sum() == pytest.approx(agg["call_tex"])
+        assert prof["put_tex"].sum() == pytest.approx(agg["put_tex"])
+
+    def test_call_negative_put_positive_in_aggregate(self):
+        # per strike the sign can flip (deep ITM puts carry positive theta), but
+        # summed across strikes the long-call leg stays negative and the short-put
+        # leg positive, same as theta_exposure
+        prof = oc.theta_exposure_by_strike(self._enriched(expiry_days=(30,)))
+        assert prof["call_tex"].sum() < 0
+        assert prof["put_tex"].sum() > 0
+
+    def test_cumulative_is_running_sum(self):
+        prof = oc.theta_exposure_by_strike(self._enriched(expiry_days=(30,), n_strikes=11))
+        assert list(prof["cumulative_net_tex"]) == pytest.approx(list(prof["net_tex"].cumsum()))
+        assert prof["cumulative_net_tex"].iloc[-1] == pytest.approx(prof["net_tex"].sum())
+
+    def test_one_wall_per_expiry_matches_aggregate(self):
+        chain = self._enriched(underlying=100.0, expiry_days=(30,), n_strikes=11)
+        prof = oc.theta_exposure_by_strike(chain)
+        walls = prof[prof["is_theta_wall"]]
+        assert len(walls) == 1
+        agg_wall = oc.theta_exposure(chain).iloc[0]["theta_wall_strike"]
+        assert walls.iloc[0]["strike"] == pytest.approx(agg_wall)
+
+    def test_no_theta_column_returns_empty(self):
+        out = oc.theta_exposure_by_strike(_synthetic_chain(expiry_days=(30,)))
+        assert out.empty
+        assert "cumulative_net_tex" in out.columns
+
+    def test_zero_oi_expiry_skipped(self):
+        chain = self._enriched(expiry_days=(30,))
+        chain["open_interest"] = 0
+        assert oc.theta_exposure_by_strike(chain).empty
+
+    def test_in_public_api(self):
+        assert hasattr(oc, "theta_exposure_by_strike")
+        assert callable(oc.theta_exposure_by_strike)
+
+
 class TestGammaFlip:
     def _enriched(self, **kw):
         return oc.enrich(_synthetic_chain(**kw), rate=0.05)

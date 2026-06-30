@@ -512,6 +512,7 @@ _EXPOSURE_BY_STRIKE = {
     "delta": ("delta_exposure_by_strike", "dex", "is_delta_wall", "DEX"),
     "gamma": ("gamma_exposure_by_strike", "gex", "is_gamma_wall", "GEX"),
     "vega": ("vega_exposure_by_strike", "vex", "is_vega_wall", "VEX"),
+    "theta": ("theta_exposure_by_strike", "tex", "is_theta_wall", "TEX"),
 }
 
 
@@ -528,8 +529,8 @@ def exposure_profile(
     strike axis instead: call and put exposure as bars at each strike, net
     exposure overlaid as a line, and markers for the exposure wall (the strike
     carrying the most gross dollar greek) and the current spot. ``greek`` picks
-    the profile -- ``'delta'``, ``'gamma'`` or ``'vega'`` -- read from the
-    matching ``*_exposure_by_strike`` table. Defaults to the nearest expiry;
+    the profile -- ``'delta'``, ``'gamma'``, ``'vega'`` or ``'theta'`` -- read
+    from the matching ``*_exposure_by_strike`` table. Defaults to the nearest expiry;
     pass ``expiry`` to pick another, like ``oc.plot.smile``.
 
     Parameters
@@ -537,9 +538,9 @@ def exposure_profile(
     chain : pd.DataFrame
         An enriched chain (see ``oc.enrich``); needs ``kind``, ``open_interest``,
         ``strike``, ``underlying_price`` and the greek column the profile reads
-        (``delta`` / ``gamma`` / ``vega``).
+        (``delta`` / ``gamma`` / ``vega`` / ``theta``).
     greek : str
-        Which exposure to plot: 'delta', 'gamma', or 'vega' (default: 'gamma').
+        Which exposure to plot: 'delta', 'gamma', 'vega', or 'theta' (default: 'gamma').
     expiry : str, pd.Timestamp, or None
         Expiry to plot. If None, the nearest (soonest) expiry is used.
     contract_size : float

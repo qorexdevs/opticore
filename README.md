@@ -138,7 +138,7 @@ oc.plot.liquidity(enriched)
 # Net dealer gamma profile with the flip level marked (nearest expiry by default)
 oc.plot.gamma_profile(enriched)
 
-# Per-strike dealer exposure (delta/gamma/vega) with the wall and spot marked
+# Per-strike dealer exposure (delta/gamma/vega/theta) with the wall and spot marked
 oc.plot.exposure_profile(enriched, greek="gamma")
 ```
 
@@ -196,6 +196,7 @@ oc.vega_exposure_by_strike(enriched)  # => the VEX profile per strike, cumulativ
 
 # Dealer theta exposure: daily decay the writing side collects or pays
 oc.theta_exposure(enriched)  # => call_tex, put_tex, net_tex, theta_wall_strike
+oc.theta_exposure_by_strike(enriched)  # => the TEX profile per strike, cumulative_net_tex brackets the flip
 ```
 
 ## Installation Options

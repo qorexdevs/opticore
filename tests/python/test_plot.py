@@ -408,6 +408,7 @@ class TestExposureProfile:
                             "delta": 0.5 if kind == "call" else -0.5,
                             "gamma": 0.04,
                             "vega": 0.18,
+                            "theta": -0.02,
                         }
                     )
         return pd.DataFrame(rows)
@@ -427,7 +428,7 @@ class TestExposureProfile:
         assert any("Wall" in s for s in labels)
 
     def test_each_greek_labels_axis(self, greek_chain):
-        for greek, tag in (("delta", "DEX"), ("gamma", "GEX"), ("vega", "VEX")):
+        for greek, tag in (("delta", "DEX"), ("gamma", "GEX"), ("vega", "VEX"), ("theta", "TEX")):
             _, ax = oc_plot.exposure_profile(greek_chain, greek=greek)
             assert tag in ax.get_ylabel()
             assert tag in ax.get_title()
@@ -450,7 +451,7 @@ class TestExposureProfile:
 
     def test_invalid_greek_raises(self, greek_chain):
         with pytest.raises(ValueError, match="greek must be one of"):
-            oc_plot.exposure_profile(greek_chain, greek="theta")
+            oc_plot.exposure_profile(greek_chain, greek="rho")
 
     def test_empty_raises(self):
         with pytest.raises(ValueError, match="No GEX data"):

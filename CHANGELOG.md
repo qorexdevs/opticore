@@ -8,6 +8,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- `theta_exposure_by_strike` returns the per-strike TEX profile behind
+  `theta_exposure` - `call_tex`/`put_tex`/`net_tex` per strike plus a
+  `cumulative_net_tex` running up the board and an `is_theta_wall` flag on the
+  gross-theta peak. The decay sibling of the other `*_exposure_by_strike`
+  profiles, same `contract_size`-only scaling so the columns sum back to the
+  aggregate. Per strike the leg sign can flip (deep ITM puts carry positive
+  theta), but summed it matches `theta_exposure`. `plot.exposure_profile` now
+  takes `greek="theta"` to chart it.
 - `theta_exposure` returns per-expiry dealer theta exposure (TEX) -
   `call_tex`/`put_tex`/`net_tex` and the gross-theta wall, the time-decay sibling
   of `vega_exposure`. Long options carry negative theta, so the long-call leg is
@@ -15,7 +23,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   writing side collects or pays while spot sits still.
 - `plot.exposure_profile` charts per-strike dealer exposure for one expiry -
   call and put bars at each strike, net exposure overlaid as a line, and the
-  exposure wall and current spot marked. `greek="delta"|"gamma"|"vega"` reads
+  exposure wall and current spot marked. `greek="delta"|"gamma"|"vega"|"theta"` reads
   the matching `*_exposure_by_strike` table, so the by-strike profiles now have
   a plot the way `gamma_profile` plots the spot sweep. Defaults to the nearest
   expiry like `plot.smile`.
