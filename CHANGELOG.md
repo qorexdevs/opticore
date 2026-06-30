@@ -8,6 +8,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- README now shows the rendered dealer-GEX-by-strike and IV-smile charts, both
+  generated from the bundled sample chain by `scripts/render_readme_charts.py`.
 - `theta_exposure_by_strike` returns the per-strike TEX profile behind
   `theta_exposure` - `call_tex`/`put_tex`/`net_tex` per strike plus a
   `cumulative_net_tex` running up the board and an `is_theta_wall` flag on the

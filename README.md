@@ -10,6 +10,16 @@
 [![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
 [![C++20](https://img.shields.io/badge/C%2B%2B-20-blue.svg)]()
 
+Read an option chain the way a dealer desk does: net gamma by strike, the wall
+where hedging flow pins, and the spot that flips the regime.
+
+![Dealer gamma exposure by strike](docs/assets/dealer-gamma-exposure.png)
+
+```python
+chain = oc.enrich(oc.fetch_chain(provider="sample", symbol="SPY"))
+oc.plot.exposure_profile(chain, greek="gamma")
+```
+
 ---
 
 ## Why OptiCore?
@@ -109,9 +119,11 @@ pip install opticore[ibkr]  # adds ib_async dependency
 
 ## Visualization
 
+![IV smile across expiries](docs/assets/vol-smile.png)
+
 ```python
 # IV Smile
-oc.plot.smile(enriched, expiry="2026-06-20")
+oc.plot.smile(enriched)
 
 # Strategy payoff diagram
 legs = [
