@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-06-30
+
 ### Added
 - README now shows the rendered dealer-GEX-by-strike and IV-smile charts, both
   generated from the bundled sample chain by `scripts/render_readme_charts.py`.
