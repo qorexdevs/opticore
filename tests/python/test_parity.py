@@ -2509,6 +2509,64 @@ class TestVegaExposure:
         assert callable(oc.vega_exposure)
 
 
+class TestThetaExposure:
+    def _enriched(self, **kw):
+        return oc.enrich(_synthetic_chain(**kw), rate=0.05)
+
+    def test_returns_expected_columns(self):
+        out = oc.theta_exposure(self._enriched(expiry_days=(30,)))
+        for col in (
+            "expiry",
+            "underlying_price",
+            "call_tex",
+            "put_tex",
+            "net_tex",
+            "theta_wall_strike",
+        ):
+            assert col in out.columns
+
+    def test_one_row_per_expiry_sorted(self):
+        out = oc.theta_exposure(self._enriched(expiry_days=(120, 30, 60)))
+        assert len(out) == 3
+        assert list(out["expiry"]) == sorted(out["expiry"])
+
+    def test_call_tex_negative_put_tex_positive(self):
+        # long options carry negative theta, so the long-call leg is negative and
+        # the short-put leg flips it positive under the long-call / short-put rule.
+        r = oc.theta_exposure(self._enriched(expiry_days=(30,))).iloc[0]
+        assert r["call_tex"] < 0
+        assert r["put_tex"] > 0
+
+    def test_net_is_call_plus_put(self):
+        r = oc.theta_exposure(self._enriched(expiry_days=(30,))).iloc[0]
+        assert r["net_tex"] == pytest.approx(r["call_tex"] + r["put_tex"])
+
+    def test_theta_wall_near_atm(self):
+        chain = self._enriched(underlying=100.0, expiry_days=(30,), n_strikes=11)
+        r = oc.theta_exposure(chain).iloc[0]
+        assert r["theta_wall_strike"] == pytest.approx(100.0)
+
+    def test_scales_with_contract_size(self):
+        chain = self._enriched(expiry_days=(30,))
+        base = oc.theta_exposure(chain, contract_size=100.0).iloc[0]["call_tex"]
+        doubled = oc.theta_exposure(chain, contract_size=200.0).iloc[0]["call_tex"]
+        assert doubled == pytest.approx(2.0 * base)
+
+    def test_no_theta_column_returns_empty(self):
+        out = oc.theta_exposure(_synthetic_chain(expiry_days=(30,)))
+        assert out.empty
+        assert "theta_wall_strike" in out.columns
+
+    def test_zero_oi_expiry_skipped(self):
+        chain = self._enriched(expiry_days=(30,))
+        chain["open_interest"] = 0
+        assert oc.theta_exposure(chain).empty
+
+    def test_in_public_api(self):
+        assert hasattr(oc, "theta_exposure")
+        assert callable(oc.theta_exposure)
+
+
 class TestGammaFlip:
     def _enriched(self, **kw):
         return oc.enrich(_synthetic_chain(**kw), rate=0.05)

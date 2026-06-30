@@ -8,6 +8,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- `theta_exposure` returns per-expiry dealer theta exposure (TEX) -
+  `call_tex`/`put_tex`/`net_tex` and the gross-theta wall, the time-decay sibling
+  of `vega_exposure`. Long options carry negative theta, so the long-call leg is
+  negative and the short-put leg positive; net TEX is the dollars per day the
+  writing side collects or pays while spot sits still.
 - `plot.exposure_profile` charts per-strike dealer exposure for one expiry -
   call and put bars at each strike, net exposure overlaid as a line, and the
   exposure wall and current spot marked. `greek="delta"|"gamma"|"vega"` reads
