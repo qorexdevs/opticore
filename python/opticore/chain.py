@@ -2319,6 +2319,58 @@ def oi_walls(chain: pd.DataFrame) -> pd.DataFrame:
     return pd.DataFrame(rows, columns=cols)
 
 
+def wall_distance(chain: pd.DataFrame) -> pd.DataFrame:
+    """How far spot sits from each open-interest wall, per expiry.
+
+    Builds on :func:`oi_walls` and adds the signed distance from the underlying
+    to each wall as a percentage of spot. ``call_wall_dist_pct`` is positive when
+    the call wall sits overhead (resistance above spot) and ``put_wall_dist_pct``
+    is negative when the put wall sits below (support under spot). The desk reads
+    these to judge how much room price has before it runs into pinned hedging
+    flow: a call wall 1% away is a much tighter ceiling than one 6% away.
+
+    Pure arithmetic on the ``oi_walls`` output, no IV solve. A side with no open
+    interest carries a NaN wall and a NaN distance. Expiries skipped by
+    ``oi_walls`` (no OI on either side) are skipped here too.
+
+    Parameters
+    ----------
+    chain : pd.DataFrame
+        Same schema as ``oi_walls``; needs ``open_interest``.
+
+    Returns
+    -------
+    pd.DataFrame
+        Columns: expiry, underlying_price, call_wall, call_wall_dist_pct,
+        put_wall, put_wall_dist_pct. One row per expiry, sorted by expiry.
+    """
+    cols = [
+        "expiry",
+        "underlying_price",
+        "call_wall",
+        "call_wall_dist_pct",
+        "put_wall",
+        "put_wall_dist_pct",
+    ]
+    walls = oi_walls(chain)
+    if walls.empty:
+        return pd.DataFrame(columns=cols)
+
+    spot = walls["underlying_price"]
+    out = pd.DataFrame(
+        {
+            "expiry": walls["expiry"],
+            "underlying_price": spot,
+            "call_wall": walls["call_wall"],
+            "call_wall_dist_pct": (walls["call_wall"] - spot) / spot * 100.0,
+            "put_wall": walls["put_wall"],
+            "put_wall_dist_pct": (walls["put_wall"] - spot) / spot * 100.0,
+        },
+        columns=cols,
+    )
+    return out.reset_index(drop=True)
+
+
 def oi_profile(chain: pd.DataFrame) -> pd.DataFrame:
     """Per-strike call/put open-interest profile, one row per expiry and strike.
 

@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- `wall_distance` reports the signed distance from spot to each open-interest
+  wall as a percentage, built on `oi_walls`. The call-wall distance is positive
+  when the wall sits overhead and the put-wall distance is negative when it sits
+  below, so the desk can read how much room price has before it runs into the
+  pinned hedging flow. A side with no OI carries a NaN wall and a NaN distance.
+
 ## [0.6.0] - 2026-06-30
 
 ### Added

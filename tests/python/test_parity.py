@@ -1794,6 +1794,54 @@ class TestOIWalls:
         assert "call_wall" in out.columns
 
 
+class TestWallDistance:
+    def _chain(self):
+        return pd.DataFrame(
+            [
+                {
+                    "expiry": "2026-07-01",
+                    "strike": 105.0,
+                    "kind": "call",
+                    "open_interest": 800,
+                    "underlying_price": 100.0,
+                },
+                {
+                    "expiry": "2026-07-01",
+                    "strike": 90.0,
+                    "kind": "put",
+                    "open_interest": 600,
+                    "underlying_price": 100.0,
+                },
+            ]
+        )
+
+    def test_signed_distance_to_each_wall(self):
+        r = oc.wall_distance(self._chain()).iloc[0]
+        assert r["call_wall"] == pytest.approx(105.0)
+        assert r["call_wall_dist_pct"] == pytest.approx(5.0)
+        assert r["put_wall"] == pytest.approx(90.0)
+        assert r["put_wall_dist_pct"] == pytest.approx(-10.0)
+
+    def test_missing_side_gives_nan_distance(self):
+        chain = self._chain()
+        chain = chain[chain["kind"] == "call"]
+        r = oc.wall_distance(chain).iloc[0]
+        assert r["call_wall_dist_pct"] == pytest.approx(5.0)
+        assert np.isnan(r["put_wall"])
+        assert np.isnan(r["put_wall_dist_pct"])
+
+    def test_one_row_per_expiry_sorted(self):
+        out = oc.wall_distance(_synthetic_chain(expiry_days=(120, 30, 60)))
+        assert len(out) == 3
+        assert list(out["expiry"]) == sorted(out["expiry"])
+
+    def test_no_open_interest_column_returns_empty(self):
+        chain = _synthetic_chain(expiry_days=(30,)).drop(columns=["open_interest"])
+        out = oc.wall_distance(chain)
+        assert out.empty
+        assert "call_wall_dist_pct" in out.columns
+
+
 class TestOIProfile:
     def test_call_put_split_and_net_per_strike(self):
         chain = pd.DataFrame(
@@ -2734,6 +2782,11 @@ def test_oi_walls_in_public_api():
 def test_oi_profile_in_public_api():
     assert hasattr(oc, "oi_profile")
     assert callable(oc.oi_profile)
+
+
+def test_wall_distance_in_public_api():
+    assert hasattr(oc, "wall_distance")
+    assert callable(oc.wall_distance)
 
 
 def test_volume_profile_in_public_api():

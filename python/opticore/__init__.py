@@ -506,6 +506,7 @@ from opticore.chain import (  # noqa: E402
     vertical,
     volume_profile,
     volume_walls,
+    wall_distance,
 )
 
 __all__ = [
@@ -541,6 +542,7 @@ __all__ = [
     "liquidity_by_strike",
     "oi_walls",
     "oi_profile",
+    "wall_distance",
     "volume_profile",
     "volume_walls",
     "delta_exposure",
