@@ -61,6 +61,24 @@ def positioning():
         print(f"gamma flip      {flip['regime']}, no flip in scanned range")
 
 
+def pinning():
+    chain = oc.fetch_chain(provider="sample", symbol="SPY")
+    enriched = oc.enrich(chain, rate=0.045, div_yield=0.013)
+
+    mpd = oc.max_pain_distance(enriched).iloc[0]
+    print(f"max pain        strike {mpd['max_pain_strike']:.0f}, "
+          f"{mpd['dist_pct']:+.1f}% from spot {mpd['underlying_price']:.0f}")
+
+    em = oc.expected_move(enriched).iloc[0]
+    print(f"expected move   +/-{em['expected_move']:.1f} ({em['move_pct'] * 100:.1f}%), "
+          f"1-sigma band {em['lower']:.0f} - {em['upper']:.0f}")
+
+    gc = oc.gamma_concentration(enriched).iloc[0]
+    print(f"gamma pinning   strike {gc['top_strike']:.0f} holds "
+          f"{gc['top_share'] * 100:.0f}% of gross gamma, top 3 hold "
+          f"{gc['top3_share'] * 100:.0f}%")
+
+
 if __name__ == "__main__":
     for name, fn in [
         ("scalar pricing / iv / greeks", scalars),
@@ -68,6 +86,7 @@ if __name__ == "__main__":
         ("sample chain enrichment", sample_chain),
         ("strategy payoff as numbers", strategy),
         ("dealer gamma exposure", positioning),
+        ("where the chain pins and how far it can move", pinning),
     ]:
         print(f"\n# {name}")
         fn()

@@ -8,6 +8,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- `examples/quickstart.py` gained a pinning section that prints `max_pain_distance`,
+  `expected_move` and `gamma_concentration` off the sample chain, so the newer
+  positioning analytics have a runnable, offline demo alongside the gamma-exposure one.
 - `gamma_concentration` collapses the per-strike GEX profile into `top_share`,
   `top3_share` and an `hhi`, weighted by gross dollar gamma. It is the GEX analogue
   of `oi_concentration`: a high reading means one or two near-spot strikes carry the
