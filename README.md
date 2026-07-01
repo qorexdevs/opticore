@@ -181,6 +181,7 @@ oc.oi_concentration(chain)# => top-strike share and HHI per expiry (how pinned t
 
 # Day's volume against standing OI - flags fresh positioning vs old carry
 oc.turnover(chain)        # => call/put turnover per expiry
+oc.volume_concentration(chain) # => top-strike share and HHI of today's traded volume
 ```
 
 Each ratio has a `*_by_strike` companion (`pcr_by_strike`, `turnover_by_strike`,

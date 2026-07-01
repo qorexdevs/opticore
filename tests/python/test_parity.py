@@ -2280,6 +2280,58 @@ class TestVolumeWalls:
         assert "call_wall" in out.columns
 
 
+class TestVolumeConcentration:
+    def _chain(self):
+        # call+put volume per strike: 100->700, 105->200, 95->100 (total 1000)
+        rows = [
+            ("2026-07-01", 100.0, "call", 500),
+            ("2026-07-01", 100.0, "put", 200),
+            ("2026-07-01", 105.0, "call", 200),
+            ("2026-07-01", 95.0, "put", 100),
+        ]
+        return pd.DataFrame(
+            [
+                {
+                    "expiry": e,
+                    "strike": k,
+                    "kind": kind,
+                    "volume": vol,
+                    "underlying_price": 100.0,
+                }
+                for e, k, kind, vol in rows
+            ]
+        )
+
+    def test_shares_and_hhi(self):
+        r = oc.volume_concentration(self._chain()).iloc[0]
+        assert r["n_strikes"] == 3
+        assert r["total_volume"] == pytest.approx(1000.0)
+        assert r["top_strike"] == pytest.approx(100.0)
+        assert r["top_share"] == pytest.approx(0.7)
+        assert r["top3_share"] == pytest.approx(1.0)
+        # 0.7^2 + 0.2^2 + 0.1^2
+        assert r["hhi"] == pytest.approx(0.54)
+
+    def test_single_strike_hhi_is_one(self):
+        chain = self._chain()
+        chain = chain[chain["strike"] == 100.0]
+        r = oc.volume_concentration(chain).iloc[0]
+        assert r["n_strikes"] == 1
+        assert r["top_share"] == pytest.approx(1.0)
+        assert r["hhi"] == pytest.approx(1.0)
+
+    def test_one_row_per_expiry_sorted(self):
+        out = oc.volume_concentration(_synthetic_chain(expiry_days=(120, 30, 60)))
+        assert len(out) == 3
+        assert list(out["expiry"]) == sorted(out["expiry"])
+
+    def test_no_volume_column_returns_empty(self):
+        chain = _synthetic_chain(expiry_days=(30,)).drop(columns=["volume"])
+        out = oc.volume_concentration(chain)
+        assert out.empty
+        assert "hhi" in out.columns
+
+
 # ── Smoke tests for public API surface ──────────────────────────────────────
 
 

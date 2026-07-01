@@ -176,6 +176,9 @@ def volume_profile(
 def volume_walls(
     chain: pd.DataFrame,
 ) -> pd.DataFrame: ...
+def volume_concentration(
+    chain: pd.DataFrame,
+) -> pd.DataFrame: ...
 def delta_exposure(
     chain: pd.DataFrame,
     contract_size: float = ...,

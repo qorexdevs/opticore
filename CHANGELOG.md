@@ -8,6 +8,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- `volume_concentration` collapses the per-strike `volume_profile` into `top_share`,
+  `top3_share` and an `hhi` on today's traded volume. It is the flow analogue of
+  `oi_concentration`: a high reading means the day's flow is aimed at a couple of
+  strikes rather than smeared two-sided down the ladder, so fresh positioning stands
+  out before it settles into open interest.
 - `examples/quickstart.py` gained a pinning section that prints `max_pain_distance`,
   `expected_move` and `gamma_concentration` off the sample chain, so the newer
   positioning analytics have a runnable, offline demo alongside the gamma-exposure one.

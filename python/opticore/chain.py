@@ -2768,6 +2768,75 @@ def volume_walls(chain: pd.DataFrame) -> pd.DataFrame:
     return pd.DataFrame(rows, columns=cols)
 
 
+def volume_concentration(chain: pd.DataFrame) -> pd.DataFrame:
+    """How tightly traded volume clusters across strikes, per expiry.
+
+    The day's-flow companion to ``oi_concentration``: where that reads clustering
+    in the standing book, this reads it in what changed hands today. Collapses the
+    ``volume_profile`` distribution into a few concentration numbers. ``top_share``
+    is the fraction of total volume at the single busiest strike and ``top3_share``
+    the fraction in the three busiest; ``hhi`` is the Herfindahl index (sum of
+    squared per-strike shares), near 0 when flow is smeared across many strikes and
+    1.0 when it all trades at one. Concentrated volume means the day's flow is
+    aimed at a couple of strikes - fresh positioning bunching up before it settles
+    into open interest - rather than routine two-sided churn spread down the ladder.
+
+    Total volume is call plus put at each strike (``volume_profile``'s
+    ``total_volume``), so it measures overall clustering, not one side. Pure
+    arithmetic, no IV solve. Ties for the top strike go to the lower one. Expiries
+    dropped by ``volume_profile`` (no volume anywhere) are skipped here too.
+
+    Parameters
+    ----------
+    chain : pd.DataFrame
+        Same schema as ``volume_profile``; needs ``volume``.
+
+    Returns
+    -------
+    pd.DataFrame
+        Columns: expiry, underlying_price, n_strikes, total_volume, top_strike,
+        top_share, top3_share, hhi. One row per expiry, sorted by expiry.
+    """
+    cols = [
+        "expiry",
+        "underlying_price",
+        "n_strikes",
+        "total_volume",
+        "top_strike",
+        "top_share",
+        "top3_share",
+        "hhi",
+    ]
+    prof = volume_profile(chain)
+    if prof.empty:
+        return pd.DataFrame(columns=cols)
+
+    rows = []
+    for exp, grp in prof.groupby("expiry", sort=True):
+        by_strike = grp.groupby("strike")["total_volume"].sum().sort_index()
+        by_strike = by_strike[by_strike > 0]
+        if by_strike.empty:
+            continue
+        total = float(by_strike.sum())
+        shares = by_strike / total
+        top_strike = float(by_strike.idxmax())
+        top3 = by_strike.sort_values(ascending=False).head(3)
+        rows.append(
+            {
+                "expiry": exp,
+                "underlying_price": float(grp["underlying_price"].iloc[0]),
+                "n_strikes": int(len(by_strike)),
+                "total_volume": total,
+                "top_strike": top_strike,
+                "top_share": float(by_strike.loc[top_strike] / total),
+                "top3_share": float(top3.sum() / total),
+                "hhi": float((shares**2).sum()),
+            }
+        )
+
+    return pd.DataFrame(rows, columns=cols)
+
+
 def delta_exposure(chain: pd.DataFrame, contract_size: float = 100.0) -> pd.DataFrame:
     """Per-expiry dealer delta exposure (DEX) from open interest and Greeks.
 
