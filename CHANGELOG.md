@@ -8,6 +8,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- `max_pain_distance` reports the signed gap from spot to the max-pain strike as a
+  percentage per expiry, built on `max_pain`. It is positive when the pin sits above
+  spot and negative when below, so the desk reads which way the open-interest magnet
+  leans without eyeballing the strike.
 - `expected_move` reads the straddle-implied move to each expiry straight off the
   ATM vol: `S * atm_iv * sqrt(tte) * sigmas`, with `lower`/`upper` bracketing spot
   by that amount and `move_pct` as a fraction of spot. Built on `atm_iv`, so it

@@ -133,6 +133,9 @@ def max_pain(
 def max_pain_curve(
     chain: pd.DataFrame,
 ) -> pd.DataFrame: ...
+def max_pain_distance(
+    chain: pd.DataFrame,
+) -> pd.DataFrame: ...
 def pcr(
     chain: pd.DataFrame,
 ) -> pd.DataFrame: ...

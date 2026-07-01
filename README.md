@@ -167,6 +167,7 @@ chain = oc.fetch_chain(provider="sample", symbol="SPY")
 # Strike that minimizes total option-holder payout, per expiry
 oc.max_pain(chain)        # => expiry, max_pain_strike, total_oi, pain_at_max_pain
 oc.max_pain_curve(chain)  # => the full pain curve per strike, is_max_pain flags the pin
+oc.max_pain_distance(chain)  # => signed % from spot to the pin (which way it leans)
 
 # Put/call ratios by open interest, volume, and dollar terms
 oc.pcr(chain)             # => oi_pcr, volume_pcr per expiry

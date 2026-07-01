@@ -930,6 +930,70 @@ class TestMaxPain:
         assert out.empty
 
 
+class TestMaxPainDistance:
+    def _chain(self):
+        # same shape as TestMaxPain.test_heavy_itm...: max pain pins at 90, spot 100
+        return pd.DataFrame(
+            [
+                {
+                    "expiry": "2026-07-01",
+                    "strike": 90.0,
+                    "kind": "call",
+                    "open_interest": 300,
+                    "underlying_price": 100.0,
+                },
+                {
+                    "expiry": "2026-07-01",
+                    "strike": 110.0,
+                    "kind": "put",
+                    "open_interest": 100,
+                    "underlying_price": 100.0,
+                },
+            ]
+        )
+
+    def test_signed_distance_to_pin(self):
+        r = oc.max_pain_distance(self._chain()).iloc[0]
+        assert r["max_pain_strike"] == pytest.approx(90.0)
+        assert r["dist_pct"] == pytest.approx(-10.0)
+
+    def test_pin_above_spot_is_positive(self):
+        # heavy ITM puts at 110 outweigh a call cluster at 90, so the pin sits
+        # above spot: pain(90)=6000, pain(110)=2000
+        chain = pd.DataFrame(
+            [
+                {
+                    "expiry": "2026-07-01",
+                    "strike": 90.0,
+                    "kind": "call",
+                    "open_interest": 100,
+                    "underlying_price": 100.0,
+                },
+                {
+                    "expiry": "2026-07-01",
+                    "strike": 110.0,
+                    "kind": "put",
+                    "open_interest": 300,
+                    "underlying_price": 100.0,
+                },
+            ]
+        )
+        r = oc.max_pain_distance(chain).iloc[0]
+        assert r["max_pain_strike"] == pytest.approx(110.0)
+        assert r["dist_pct"] == pytest.approx(10.0)
+
+    def test_one_row_per_expiry_sorted(self):
+        out = oc.max_pain_distance(_synthetic_chain(expiry_days=(120, 30, 60)))
+        assert len(out) == 3
+        assert list(out["expiry"]) == sorted(out["expiry"])
+
+    def test_no_open_interest_column_returns_empty(self):
+        chain = _synthetic_chain(expiry_days=(30,)).drop(columns=["open_interest"])
+        out = oc.max_pain_distance(chain)
+        assert out.empty
+        assert "dist_pct" in out.columns
+
+
 class TestMaxPainCurve:
     def _two_strike_chain(self):
         # same hand-checked chain as TestMaxPain: pain(90)=2000, pain(110)=6000
@@ -2851,6 +2915,11 @@ class TestGammaFlip:
 def test_max_pain_in_public_api():
     assert hasattr(oc, "max_pain")
     assert callable(oc.max_pain)
+
+
+def test_max_pain_distance_in_public_api():
+    assert hasattr(oc, "max_pain_distance")
+    assert callable(oc.max_pain_distance)
 
 
 def test_pcr_in_public_api():

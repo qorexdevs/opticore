@@ -1687,6 +1687,47 @@ def max_pain_curve(chain: pd.DataFrame) -> pd.DataFrame:
     return pd.DataFrame(rows, columns=cols)
 
 
+def max_pain_distance(chain: pd.DataFrame) -> pd.DataFrame:
+    """Signed distance from spot to the max-pain strike, per expiry.
+
+    Builds on :func:`max_pain` and adds ``dist_pct``, the signed gap from the
+    underlying to the max-pain strike as a percentage of spot. It is positive
+    when max pain sits above spot (the pin pulls up into expiry) and negative
+    when it sits below (the pin pulls down), so the desk can read which way and
+    how hard the open-interest magnet leans without eyeballing the strike.
+
+    Pure open-interest arithmetic, no IV solve. Expiries skipped by ``max_pain``
+    (no open interest at all) are skipped here too.
+
+    Parameters
+    ----------
+    chain : pd.DataFrame
+        Same schema as ``max_pain``; needs ``open_interest``.
+
+    Returns
+    -------
+    pd.DataFrame
+        Columns: expiry, underlying_price, max_pain_strike, dist_pct. One row per
+        expiry, sorted by expiry.
+    """
+    cols = ["expiry", "underlying_price", "max_pain_strike", "dist_pct"]
+    mp = max_pain(chain)
+    if mp.empty:
+        return pd.DataFrame(columns=cols)
+
+    spot = mp["underlying_price"]
+    out = pd.DataFrame(
+        {
+            "expiry": mp["expiry"],
+            "underlying_price": spot,
+            "max_pain_strike": mp["max_pain_strike"],
+            "dist_pct": (mp["max_pain_strike"] - spot) / spot * 100.0,
+        },
+        columns=cols,
+    )
+    return out.reset_index(drop=True)
+
+
 def pcr(chain: pd.DataFrame) -> pd.DataFrame:
     """Per-expiry put/call ratio from open interest and volume.
 
