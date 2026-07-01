@@ -176,6 +176,7 @@ oc.dollar_volume(chain)   # => premium turnover, dollar_volume_pcr per expiry
 oc.oi_walls(chain)        # => call_wall, put_wall and their OI per expiry
 oc.volume_walls(chain)    # => the same walls keyed on traded volume per expiry
 oc.wall_distance(chain)   # => signed % from spot to each wall (room before the pin)
+oc.oi_concentration(chain)# => top-strike share and HHI per expiry (how pinned the book is)
 
 # Day's volume against standing OI - flags fresh positioning vs old carry
 oc.turnover(chain)        # => call/put turnover per expiry

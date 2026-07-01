@@ -13,6 +13,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   when the wall sits overhead and the put-wall distance is negative when it sits
   below, so the desk can read how much room price has before it runs into the
   pinned hedging flow. A side with no OI carries a NaN wall and a NaN distance.
+- `oi_concentration` collapses the `oi_profile` distribution into per-expiry
+  clustering numbers: `top_share` and `top3_share` (fraction of total OI in the
+  heaviest one and three strikes) plus `hhi`, the Herfindahl index that runs from
+  near 0 when OI is spread across the ladder up to 1.0 when it all sits at one
+  strike. Reads as pin risk - the same wall bunched tight pulls harder into
+  expiry than OI smeared across many strikes.
 
 ## [0.6.0] - 2026-06-30
 

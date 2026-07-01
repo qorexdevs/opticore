@@ -2440,6 +2440,72 @@ def oi_profile(chain: pd.DataFrame) -> pd.DataFrame:
     return pd.DataFrame(rows, columns=cols)
 
 
+def oi_concentration(chain: pd.DataFrame) -> pd.DataFrame:
+    """How tightly open interest clusters across strikes, per expiry.
+
+    Collapses the ``oi_profile`` distribution into a few concentration numbers.
+    ``top_share`` is the fraction of total OI sitting at the single heaviest
+    strike and ``top3_share`` the fraction in the three heaviest; ``hhi`` is the
+    Herfindahl index (sum of squared per-strike shares), running from ~0 when OI
+    is spread thin over many strikes up to 1.0 when it all sits at one. The desk
+    reads a high reading as pin risk: positioning bunched at a couple of strikes
+    pulls harder into expiry than the same OI smeared across the ladder, even
+    when the single wall looks the same.
+
+    Total OI here is call plus put at each strike (``oi_profile``'s ``total_oi``),
+    so it measures overall clustering, not one side. Pure arithmetic, no IV
+    solve. Ties for the top strike go to the lower one. Expiries dropped by
+    ``oi_profile`` (no OI anywhere) are skipped here too.
+
+    Parameters
+    ----------
+    chain : pd.DataFrame
+        Same schema as ``oi_profile``; needs ``open_interest``.
+
+    Returns
+    -------
+    pd.DataFrame
+        Columns: expiry, underlying_price, n_strikes, total_oi, top_strike,
+        top_share, top3_share, hhi. One row per expiry, sorted by expiry.
+    """
+    cols = [
+        "expiry",
+        "underlying_price",
+        "n_strikes",
+        "total_oi",
+        "top_strike",
+        "top_share",
+        "top3_share",
+        "hhi",
+    ]
+    prof = oi_profile(chain)
+    if prof.empty:
+        return pd.DataFrame(columns=cols)
+
+    rows = []
+    for exp, grp in prof.groupby("expiry", sort=True):
+        by_strike = grp.groupby("strike")["total_oi"].sum().sort_index()
+        by_strike = by_strike[by_strike > 0]
+        total = float(by_strike.sum())
+        shares = by_strike / total
+        top_strike = float(by_strike.idxmax())
+        top3 = by_strike.sort_values(ascending=False).head(3)
+        rows.append(
+            {
+                "expiry": exp,
+                "underlying_price": float(grp["underlying_price"].iloc[0]),
+                "n_strikes": int(len(by_strike)),
+                "total_oi": total,
+                "top_strike": top_strike,
+                "top_share": float(by_strike.loc[top_strike] / total),
+                "top3_share": float(top3.sum() / total),
+                "hhi": float((shares**2).sum()),
+            }
+        )
+
+    return pd.DataFrame(rows, columns=cols)
+
+
 def volume_profile(chain: pd.DataFrame) -> pd.DataFrame:
     """Per-strike call/put traded-volume profile, one row per expiry and strike.
 
