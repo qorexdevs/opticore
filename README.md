@@ -211,6 +211,7 @@ oc.gamma_flip(enriched, rate=0.05)  # => net_gex, flip_spot, flip_distance_pct, 
 # Dealer vega exposure: long or short vol through the book, per vol point
 oc.vega_exposure(enriched)  # => call_vex, put_vex, net_vex, vega_wall_strike
 oc.vega_exposure_by_strike(enriched)  # => the VEX profile per strike, cumulative_net_vex brackets the flip
+oc.vega_concentration(enriched)  # => top-strike share and HHI of gross vega (how pinned the vol book is)
 
 # Dealer theta exposure: daily decay the writing side collects or pays
 oc.theta_exposure(enriched)  # => call_tex, put_tex, net_tex, theta_wall_strike

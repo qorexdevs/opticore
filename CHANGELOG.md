@@ -8,6 +8,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- `vega_concentration` collapses the `vega_exposure_by_strike` profile into
+  `top_share`, `top3_share` and `hhi` on gross dollar vega, the VEX analogue of
+  `gamma_concentration`. Where gamma bunches at spot, vega bunches out in the
+  wings of longer-dated strikes, so a high reading flags one or two strikes where
+  a vol move hits the whole hedging book at once.
 - `volume_wall_distance` reports the signed gap from spot to each traded-volume wall
   as a percentage, the flow analogue of `wall_distance`. `volume_walls` found the
   busy strikes but left the room-to-spot read to the caller; a call wall pinned on

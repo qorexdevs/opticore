@@ -3656,6 +3656,80 @@ def vega_exposure_by_strike(chain: pd.DataFrame, contract_size: float = 100.0) -
     return pd.DataFrame(rows, columns=cols)
 
 
+def vega_concentration(chain: pd.DataFrame, contract_size: float = 100.0) -> pd.DataFrame:
+    """How tightly dealer vega clusters across strikes, per expiry.
+
+    The VEX analogue of ``gamma_concentration``: it collapses the
+    ``vega_exposure_by_strike`` profile into a few numbers. Weighting is gross
+    dollar vega at each strike (``|call_vex| + |put_vex|``, sign ignored), so it
+    reads where the vol risk bunches regardless of which way the book leans.
+    ``top_share`` is the fraction of gross vega at the single heaviest strike,
+    ``top3_share`` the fraction in the three heaviest, and ``hhi`` the Herfindahl
+    index running from ~0 when vega is smeared over many strikes up to 1.0 when it
+    all sits at one. Unlike gamma, vega peaks out in the wings of longer-dated
+    strikes rather than at spot, so a high reading flags one or two strikes where
+    a vol move hits the whole book at once - a concentrated place for the hedger to
+    be short or long convexity.
+
+    Built on ``vega_exposure_by_strike`` and inherits its scaling and NaN rules:
+    per option ``sign * vega * open_interest * contract_size``, vega already per 1%
+    vol move. Expiries with no usable vega are skipped there and so absent here
+    too. Ties for the top strike go to the lower one.
+
+    Parameters
+    ----------
+    chain : pd.DataFrame
+        An enriched chain (see ``enrich``); needs ``vega`` and ``open_interest``.
+    contract_size : float
+        Shares per contract (default: 100).
+
+    Returns
+    -------
+    pd.DataFrame
+        Columns: expiry, underlying_price, n_strikes, gross_vex, top_strike,
+        top_share, top3_share, hhi. One row per expiry, sorted by expiry.
+    """
+    cols = [
+        "expiry",
+        "underlying_price",
+        "n_strikes",
+        "gross_vex",
+        "top_strike",
+        "top_share",
+        "top3_share",
+        "hhi",
+    ]
+    prof = vega_exposure_by_strike(chain, contract_size=contract_size)
+    if prof.empty:
+        return pd.DataFrame(columns=cols)
+
+    prof = prof.assign(_gross=prof["call_vex"].abs() + prof["put_vex"].abs())
+    rows = []
+    for exp, grp in prof.groupby("expiry", sort=True):
+        by_strike = grp.groupby("strike")["_gross"].sum().sort_index()
+        by_strike = by_strike[by_strike > 0]
+        if by_strike.empty:
+            continue
+        total = float(by_strike.sum())
+        shares = by_strike / total
+        top_strike = float(by_strike.idxmax())
+        top3 = by_strike.sort_values(ascending=False).head(3)
+        rows.append(
+            {
+                "expiry": exp,
+                "underlying_price": float(grp["underlying_price"].iloc[0]),
+                "n_strikes": int(len(by_strike)),
+                "gross_vex": total,
+                "top_strike": top_strike,
+                "top_share": float(by_strike.loc[top_strike] / total),
+                "top3_share": float(top3.sum() / total),
+                "hhi": float((shares**2).sum()),
+            }
+        )
+
+    return pd.DataFrame(rows, columns=cols)
+
+
 def theta_exposure(chain: pd.DataFrame, contract_size: float = 100.0) -> pd.DataFrame:
     """Per-expiry dealer theta exposure (TEX) from open interest and Greeks.
 
