@@ -176,6 +176,9 @@ def volume_profile(
 def volume_walls(
     chain: pd.DataFrame,
 ) -> pd.DataFrame: ...
+def volume_wall_distance(
+    chain: pd.DataFrame,
+) -> pd.DataFrame: ...
 def volume_concentration(
     chain: pd.DataFrame,
 ) -> pd.DataFrame: ...

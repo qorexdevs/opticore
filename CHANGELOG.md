@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- `volume_wall_distance` reports the signed gap from spot to each traded-volume wall
+  as a percentage, the flow analogue of `wall_distance`. `volume_walls` found the
+  busy strikes but left the room-to-spot read to the caller; a call wall pinned on
+  top of spot is fresh flow defended at the money, one several percent out is
+  positioning for a move rather than a pin.
+
 ## [0.7.0] - 2026-07-02
 
 ### Added

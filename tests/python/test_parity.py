@@ -2332,6 +2332,54 @@ class TestVolumeConcentration:
         assert "hhi" in out.columns
 
 
+class TestVolumeWallDistance:
+    def _chain(self):
+        return pd.DataFrame(
+            [
+                {
+                    "expiry": "2026-07-01",
+                    "strike": 105.0,
+                    "kind": "call",
+                    "volume": 800,
+                    "underlying_price": 100.0,
+                },
+                {
+                    "expiry": "2026-07-01",
+                    "strike": 90.0,
+                    "kind": "put",
+                    "volume": 600,
+                    "underlying_price": 100.0,
+                },
+            ]
+        )
+
+    def test_signed_distance_to_each_wall(self):
+        r = oc.volume_wall_distance(self._chain()).iloc[0]
+        assert r["call_wall"] == pytest.approx(105.0)
+        assert r["call_wall_dist_pct"] == pytest.approx(5.0)
+        assert r["put_wall"] == pytest.approx(90.0)
+        assert r["put_wall_dist_pct"] == pytest.approx(-10.0)
+
+    def test_missing_side_gives_nan_distance(self):
+        chain = self._chain()
+        chain = chain[chain["kind"] == "call"]
+        r = oc.volume_wall_distance(chain).iloc[0]
+        assert r["call_wall_dist_pct"] == pytest.approx(5.0)
+        assert np.isnan(r["put_wall"])
+        assert np.isnan(r["put_wall_dist_pct"])
+
+    def test_one_row_per_expiry_sorted(self):
+        out = oc.volume_wall_distance(_synthetic_chain(expiry_days=(120, 30, 60)))
+        assert len(out) == 3
+        assert list(out["expiry"]) == sorted(out["expiry"])
+
+    def test_no_volume_column_returns_empty(self):
+        chain = _synthetic_chain(expiry_days=(30,)).drop(columns=["volume"])
+        out = oc.volume_wall_distance(chain)
+        assert out.empty
+        assert "call_wall_dist_pct" in out.columns
+
+
 # ── Smoke tests for public API surface ──────────────────────────────────────
 
 
@@ -3075,6 +3123,11 @@ def test_volume_profile_in_public_api():
 def test_volume_walls_in_public_api():
     assert hasattr(oc, "volume_walls")
     assert callable(oc.volume_walls)
+
+
+def test_volume_wall_distance_in_public_api():
+    assert hasattr(oc, "volume_wall_distance")
+    assert callable(oc.volume_wall_distance)
 
 
 def test_delta_exposure_in_public_api():

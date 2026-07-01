@@ -2768,6 +2768,60 @@ def volume_walls(chain: pd.DataFrame) -> pd.DataFrame:
     return pd.DataFrame(rows, columns=cols)
 
 
+def volume_wall_distance(chain: pd.DataFrame) -> pd.DataFrame:
+    """How far spot sits from each traded-volume wall, per expiry.
+
+    The day's-flow companion to :func:`wall_distance`: where that measures the
+    gap to the standing open-interest walls, this measures it to the strikes that
+    traded the most today. Builds on :func:`volume_walls` and adds the signed
+    distance from the underlying to each wall as a percentage of spot.
+    ``call_wall_dist_pct`` is positive when the busy call strike sits overhead and
+    ``put_wall_dist_pct`` negative when the busy put strike sits below. A volume
+    wall pinned right on top of spot is fresh flow being defended at the money;
+    one several percent out is positioning for a move, not a pin.
+
+    Pure arithmetic on the ``volume_walls`` output, no IV solve. A side with no
+    volume carries a NaN wall and a NaN distance. Expiries skipped by
+    ``volume_walls`` (no volume on either side) are skipped here too.
+
+    Parameters
+    ----------
+    chain : pd.DataFrame
+        Same schema as ``volume_walls``; needs ``volume``.
+
+    Returns
+    -------
+    pd.DataFrame
+        Columns: expiry, underlying_price, call_wall, call_wall_dist_pct,
+        put_wall, put_wall_dist_pct. One row per expiry, sorted by expiry.
+    """
+    cols = [
+        "expiry",
+        "underlying_price",
+        "call_wall",
+        "call_wall_dist_pct",
+        "put_wall",
+        "put_wall_dist_pct",
+    ]
+    walls = volume_walls(chain)
+    if walls.empty:
+        return pd.DataFrame(columns=cols)
+
+    spot = walls["underlying_price"]
+    out = pd.DataFrame(
+        {
+            "expiry": walls["expiry"],
+            "underlying_price": spot,
+            "call_wall": walls["call_wall"],
+            "call_wall_dist_pct": (walls["call_wall"] - spot) / spot * 100.0,
+            "put_wall": walls["put_wall"],
+            "put_wall_dist_pct": (walls["put_wall"] - spot) / spot * 100.0,
+        },
+        columns=cols,
+    )
+    return out.reset_index(drop=True)
+
+
 def volume_concentration(chain: pd.DataFrame) -> pd.DataFrame:
     """How tightly traded volume clusters across strikes, per expiry.
 

@@ -510,6 +510,7 @@ from opticore.chain import (  # noqa: E402
     vertical,
     volume_concentration,
     volume_profile,
+    volume_wall_distance,
     volume_walls,
     wall_distance,
 )
@@ -553,6 +554,7 @@ __all__ = [
     "wall_distance",
     "volume_profile",
     "volume_walls",
+    "volume_wall_distance",
     "volume_concentration",
     "delta_exposure",
     "delta_exposure_by_strike",
