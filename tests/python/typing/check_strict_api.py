@@ -49,6 +49,9 @@ fwd = oc.implied_forward(chain, rate=0.045)
 # ── atm_iv → DataFrame ──────────────────────────────────────────────────────
 atm = oc.atm_iv(chain, rate=0.045)
 
+# ── expected_move → DataFrame ───────────────────────────────────────────────
+em = oc.expected_move(chain, sigmas=1.0, rate=0.045)
+
 # ── check_connection → ConnectionStatus TypedDict ───────────────────────────
 status = oc.check_connection()
 connected: bool = status["connected"]

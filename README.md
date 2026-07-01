@@ -211,6 +211,10 @@ oc.vega_exposure_by_strike(enriched)  # => the VEX profile per strike, cumulativ
 # Dealer theta exposure: daily decay the writing side collects or pays
 oc.theta_exposure(enriched)  # => call_tex, put_tex, net_tex, theta_wall_strike
 oc.theta_exposure_by_strike(enriched)  # => the TEX profile per strike, cumulative_net_tex brackets the flip
+
+# Straddle-implied expected move to each expiry, straight off the ATM vol
+oc.expected_move(chain)  # => atm_iv, expected_move, move_pct and the lower/upper 1-sigma band
+oc.expected_move(chain, sigmas=2.0)  # widen to the ~95% band
 ```
 
 ## Installation Options

@@ -591,6 +591,85 @@ def atm_iv(
     return pd.DataFrame(rows, columns=cols)
 
 
+def expected_move(
+    chain: pd.DataFrame,
+    sigmas: float = 1.0,
+    rate: float = 0.045,
+    div_yield: float = 0.0,
+    price_col: str = "mid",
+) -> pd.DataFrame:
+    """Straddle-implied expected move to each expiry, one row per expiry.
+
+    The move the options market is pricing for the underlying between now and
+    each expiry, read straight off the ATM vol:
+
+        move = S * atm_iv * sqrt(tte) * sigmas
+
+    That is the lognormal 1-sigma move scaled by ``sigmas``. ``lower`` and
+    ``upper`` bracket spot by that amount, so a straddle buyer breaks even
+    roughly at the ``sigmas=1`` edges and a range trader watches the band.
+    ``move_pct`` is the same as a fraction of spot. Bump ``sigmas`` to 2 for the
+    wider ~95% band.
+
+    Built on ``atm_iv`` - expiries whose ATM vol could not be solved are
+    skipped, same as there.
+
+    Parameters
+    ----------
+    chain : pd.DataFrame
+        Same schema as ``enrich`` / ``atm_iv``.
+    sigmas : float
+        How many standard deviations to scale the move by (default: 1.0).
+    rate : float
+        Risk-free rate (default: 0.045).
+    div_yield : float
+        Continuous dividend yield (default: 0.0).
+    price_col : str
+        Which price to use (default: 'mid').
+
+    Returns
+    -------
+    pd.DataFrame
+        Columns: expiry, tte, underlying_price, atm_iv, expected_move,
+        move_pct, lower, upper. One row per expiry, sorted by expiry.
+
+    Examples
+    --------
+    >>> import opticore as oc
+    >>> oc.expected_move(chain, sigmas=1.0)  # doctest: +SKIP
+    """
+    cols = [
+        "expiry",
+        "tte",
+        "underlying_price",
+        "atm_iv",
+        "expected_move",
+        "move_pct",
+        "lower",
+        "upper",
+    ]
+    atm = atm_iv(chain, rate=rate, div_yield=div_yield, price_col=price_col)
+    if atm.empty:
+        return pd.DataFrame(columns=cols)
+
+    spot = atm["underlying_price"].to_numpy()
+    move = spot * atm["atm_iv"].to_numpy() * np.sqrt(atm["tte"].to_numpy()) * sigmas
+    out = pd.DataFrame(
+        {
+            "expiry": atm["expiry"].to_numpy(),
+            "tte": atm["tte"].to_numpy(),
+            "underlying_price": spot,
+            "atm_iv": atm["atm_iv"].to_numpy(),
+            "expected_move": move,
+            "move_pct": np.where(spot != 0.0, move / spot, np.nan),
+            "lower": spot - move,
+            "upper": spot + move,
+        },
+        columns=cols,
+    )
+    return out
+
+
 class TermSlope(NamedTuple):
     """Least-squares slope of the ATM IV term structure.
 

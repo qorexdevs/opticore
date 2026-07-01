@@ -228,6 +228,53 @@ class TestAtmIv:
         assert "atm_iv" in out.columns
 
 
+# ── expected_move ────────────────────────────────────────────────────────────
+
+
+class TestExpectedMove:
+    def test_matches_s_iv_sqrt_t(self):
+        chain = _synthetic_chain(vol=0.20, rate=0.05, expiry_days=(30,))
+        out = oc.expected_move(chain, rate=0.05)
+        assert len(out) == 1
+        row = out.iloc[0]
+        want = row["underlying_price"] * row["atm_iv"] * np.sqrt(row["tte"])
+        assert abs(row["expected_move"] - want) < 1e-9
+        assert row["lower"] == pytest.approx(row["underlying_price"] - row["expected_move"])
+        assert row["upper"] == pytest.approx(row["underlying_price"] + row["expected_move"])
+        assert row["move_pct"] == pytest.approx(row["expected_move"] / row["underlying_price"])
+
+    def test_sigmas_scales_the_band(self):
+        chain = _synthetic_chain(vol=0.20, rate=0.05, expiry_days=(45,))
+        one = oc.expected_move(chain, sigmas=1.0, rate=0.05)["expected_move"].iloc[0]
+        two = oc.expected_move(chain, sigmas=2.0, rate=0.05)["expected_move"].iloc[0]
+        assert two == pytest.approx(2.0 * one)
+
+    def test_longer_tenor_moves_more(self):
+        chain = _synthetic_chain(vol=0.20, rate=0.05, expiry_days=(30, 90, 180))
+        out = oc.expected_move(chain, rate=0.05)
+        assert out["tte"].is_monotonic_increasing
+        assert out["expected_move"].is_monotonic_increasing
+
+    def test_returns_expected_columns(self):
+        out = oc.expected_move(_synthetic_chain(rate=0.05), rate=0.05)
+        assert set(out.columns) == {
+            "expiry",
+            "tte",
+            "underlying_price",
+            "atm_iv",
+            "expected_move",
+            "move_pct",
+            "lower",
+            "upper",
+        }
+
+    def test_empty_chain_returns_empty_frame(self):
+        empty = pd.DataFrame(columns=["expiry", "strike", "kind", "underlying_price", "mid"])
+        out = oc.expected_move(empty)
+        assert out.empty
+        assert "expected_move" in out.columns
+
+
 # ── term_slope ───────────────────────────────────────────────────────────────
 
 

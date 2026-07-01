@@ -161,6 +161,13 @@ def atm_iv(
     div_yield: float = ...,
     price_col: str = ...,
 ) -> pd.DataFrame: ...
+def expected_move(
+    chain: pd.DataFrame,
+    sigmas: float = ...,
+    rate: float = ...,
+    div_yield: float = ...,
+    price_col: str = ...,
+) -> pd.DataFrame: ...
 
 class TermSlope(NamedTuple):
     slope: float

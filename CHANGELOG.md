@@ -8,6 +8,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- `expected_move` reads the straddle-implied move to each expiry straight off the
+  ATM vol: `S * atm_iv * sqrt(tte) * sigmas`, with `lower`/`upper` bracketing spot
+  by that amount and `move_pct` as a fraction of spot. Built on `atm_iv`, so it
+  skips expiries whose ATM vol could not be solved; `sigmas` widens the band (2.0
+  for the ~95% range).
 - `wall_distance` reports the signed distance from spot to each open-interest
   wall as a percentage, built on `oi_walls`. The call-wall distance is positive
   when the wall sits overhead and the put-wall distance is negative when it sits
