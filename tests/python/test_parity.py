@@ -2581,6 +2581,64 @@ class TestGammaExposureByStrike:
         assert callable(oc.gamma_exposure_by_strike)
 
 
+class TestGammaConcentration:
+    def _enriched(self, **kw):
+        return oc.enrich(_synthetic_chain(**kw), rate=0.05)
+
+    def test_returns_expected_columns(self):
+        out = oc.gamma_concentration(self._enriched(expiry_days=(30,)))
+        for col in (
+            "expiry",
+            "underlying_price",
+            "n_strikes",
+            "gross_gex",
+            "top_strike",
+            "top_share",
+            "top3_share",
+            "hhi",
+        ):
+            assert col in out.columns
+
+    def test_one_row_per_expiry_sorted(self):
+        out = oc.gamma_concentration(self._enriched(expiry_days=(120, 30, 60)))
+        assert len(out) == 3
+        assert list(out["expiry"]) == sorted(out["expiry"])
+
+    def test_shares_bounded_and_ordered(self):
+        r = oc.gamma_concentration(self._enriched(expiry_days=(30,), n_strikes=11)).iloc[0]
+        assert 0.0 < r["top_share"] <= r["top3_share"] <= 1.0
+        assert r["gross_gex"] > 0
+
+    def test_hhi_between_top_share_squared_bound_and_one(self):
+        r = oc.gamma_concentration(self._enriched(expiry_days=(30,), n_strikes=11)).iloc[0]
+        assert r["top_share"] ** 2 <= r["hhi"] + 1e-9
+        assert r["hhi"] <= 1.0 + 1e-9
+
+    def test_top_strike_near_atm(self):
+        # gross gamma peaks at-the-money, so the heaviest strike sits at spot
+        r = oc.gamma_concentration(
+            self._enriched(underlying=100.0, expiry_days=(30,), n_strikes=11)
+        ).iloc[0]
+        assert r["top_strike"] == pytest.approx(100.0)
+
+    def test_single_strike_hhi_is_one(self):
+        chain = self._enriched(underlying=100.0, expiry_days=(30,), n_strikes=11)
+        chain = chain[chain["strike"] == 100.0]
+        r = oc.gamma_concentration(chain).iloc[0]
+        assert r["n_strikes"] == 1
+        assert r["top_share"] == pytest.approx(1.0)
+        assert r["hhi"] == pytest.approx(1.0)
+
+    def test_no_gamma_column_returns_empty(self):
+        out = oc.gamma_concentration(_synthetic_chain(expiry_days=(30,)))
+        assert out.empty
+        assert "hhi" in out.columns
+
+    def test_in_public_api(self):
+        assert hasattr(oc, "gamma_concentration")
+        assert callable(oc.gamma_concentration)
+
+
 class TestVegaExposureByStrike:
     def _enriched(self, **kw):
         return oc.enrich(_synthetic_chain(**kw), rate=0.05)

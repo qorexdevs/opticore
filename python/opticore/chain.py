@@ -3119,6 +3119,80 @@ def gamma_exposure_by_strike(chain: pd.DataFrame, contract_size: float = 100.0) 
     return pd.DataFrame(rows, columns=cols)
 
 
+def gamma_concentration(chain: pd.DataFrame, contract_size: float = 100.0) -> pd.DataFrame:
+    """How tightly dealer gamma clusters across strikes, per expiry.
+
+    The GEX analogue of ``oi_concentration``: it collapses the
+    ``gamma_exposure_by_strike`` profile into a few numbers. Weighting is gross
+    dollar gamma at each strike (``|call_gex| + |put_gex|``, sign ignored), so it
+    measures where hedging flow bunches regardless of which way it leans.
+    ``top_share`` is the fraction of gross gamma at the single heaviest strike,
+    ``top3_share`` the fraction in the three heaviest, and ``hhi`` the Herfindahl
+    index running from ~0 when gamma is smeared over many strikes up to 1.0 when
+    it all sits at one. Read like ``oi_concentration`` but sharper into expiry:
+    gamma peaks at-the-money, so a high reading usually means one or two near-spot
+    strikes carry the whole hedging book and pin harder than the same gamma spread
+    down the ladder.
+
+    Built on ``gamma_exposure_by_strike`` and inherits its scaling and NaN rules:
+    per option ``sign * gamma * open_interest * contract_size * S**2 * 0.01``.
+    Expiries with no usable gamma are skipped there and so absent here too. Ties
+    for the top strike go to the lower one.
+
+    Parameters
+    ----------
+    chain : pd.DataFrame
+        An enriched chain (see ``enrich``); needs ``gamma`` and ``open_interest``.
+    contract_size : float
+        Shares per contract (default: 100).
+
+    Returns
+    -------
+    pd.DataFrame
+        Columns: expiry, underlying_price, n_strikes, gross_gex, top_strike,
+        top_share, top3_share, hhi. One row per expiry, sorted by expiry.
+    """
+    cols = [
+        "expiry",
+        "underlying_price",
+        "n_strikes",
+        "gross_gex",
+        "top_strike",
+        "top_share",
+        "top3_share",
+        "hhi",
+    ]
+    prof = gamma_exposure_by_strike(chain, contract_size=contract_size)
+    if prof.empty:
+        return pd.DataFrame(columns=cols)
+
+    prof = prof.assign(_gross=prof["call_gex"].abs() + prof["put_gex"].abs())
+    rows = []
+    for exp, grp in prof.groupby("expiry", sort=True):
+        by_strike = grp.groupby("strike")["_gross"].sum().sort_index()
+        by_strike = by_strike[by_strike > 0]
+        if by_strike.empty:
+            continue
+        total = float(by_strike.sum())
+        shares = by_strike / total
+        top_strike = float(by_strike.idxmax())
+        top3 = by_strike.sort_values(ascending=False).head(3)
+        rows.append(
+            {
+                "expiry": exp,
+                "underlying_price": float(grp["underlying_price"].iloc[0]),
+                "n_strikes": int(len(by_strike)),
+                "gross_gex": total,
+                "top_strike": top_strike,
+                "top_share": float(by_strike.loc[top_strike] / total),
+                "top3_share": float(top3.sum() / total),
+                "hhi": float((shares**2).sum()),
+            }
+        )
+
+    return pd.DataFrame(rows, columns=cols)
+
+
 def _scan_gamma_net(grp, rate, div_yield, contract_size, spot_range, n_points):
     """Scan net and gross dealer GEX across a spot grid for one expiry group.
 

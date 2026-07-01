@@ -192,6 +192,10 @@ def gamma_exposure_by_strike(
     chain: pd.DataFrame,
     contract_size: float = ...,
 ) -> pd.DataFrame: ...
+def gamma_concentration(
+    chain: pd.DataFrame,
+    contract_size: float = ...,
+) -> pd.DataFrame: ...
 def gamma_flip(
     chain: pd.DataFrame,
     rate: float = ...,

@@ -8,6 +8,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- `gamma_concentration` collapses the per-strike GEX profile into `top_share`,
+  `top3_share` and an `hhi`, weighted by gross dollar gamma. It is the GEX analogue
+  of `oi_concentration`: a high reading means one or two near-spot strikes carry the
+  whole hedging book and pin harder than the same gamma spread down the ladder.
 - `max_pain_distance` reports the signed gap from spot to the max-pain strike as a
   percentage per expiry, built on `max_pain`. It is positive when the pin sits above
   spot and negative when below, so the desk reads which way the open-interest magnet
