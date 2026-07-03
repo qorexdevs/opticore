@@ -230,3 +230,7 @@ def theta_exposure_by_strike(
     chain: pd.DataFrame,
     contract_size: float = ...,
 ) -> pd.DataFrame: ...
+def theta_concentration(
+    chain: pd.DataFrame,
+    contract_size: float = ...,
+) -> pd.DataFrame: ...

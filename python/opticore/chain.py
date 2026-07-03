@@ -3903,3 +3903,76 @@ def theta_exposure_by_strike(chain: pd.DataFrame, contract_size: float = 100.0) 
             )
 
     return pd.DataFrame(rows, columns=cols)
+
+
+def theta_concentration(chain: pd.DataFrame, contract_size: float = 100.0) -> pd.DataFrame:
+    """How tightly dealer theta clusters across strikes, per expiry.
+
+    The TEX analogue of ``vega_concentration``: it collapses the
+    ``theta_exposure_by_strike`` profile into a few numbers. Weighting is gross
+    dollar theta at each strike (``|call_tex| + |put_tex|``, sign ignored), so it
+    reads where the decay bunches regardless of which way the book leans.
+    ``top_share`` is the fraction of gross theta at the single heaviest strike,
+    ``top3_share`` the fraction in the three heaviest, and ``hhi`` the Herfindahl
+    index running from ~0 when theta is smeared over many strikes up to 1.0 when it
+    all sits at one. Theta peaks near the money, so a high reading is the usual case
+    for short-dated expiries where one or two ATM strikes carry the whole day's
+    decay - the strikes a pin most rewards, or hurts, the writing side.
+
+    Built on ``theta_exposure_by_strike`` and inherits its scaling and NaN rules:
+    per option ``sign * theta * open_interest * contract_size``, theta already the
+    per-day decay. Expiries with no usable theta are skipped there and so absent
+    here too. Ties for the top strike go to the lower one.
+
+    Parameters
+    ----------
+    chain : pd.DataFrame
+        An enriched chain (see ``enrich``); needs ``theta`` and ``open_interest``.
+    contract_size : float
+        Shares per contract (default: 100).
+
+    Returns
+    -------
+    pd.DataFrame
+        Columns: expiry, underlying_price, n_strikes, gross_tex, top_strike,
+        top_share, top3_share, hhi. One row per expiry, sorted by expiry.
+    """
+    cols = [
+        "expiry",
+        "underlying_price",
+        "n_strikes",
+        "gross_tex",
+        "top_strike",
+        "top_share",
+        "top3_share",
+        "hhi",
+    ]
+    prof = theta_exposure_by_strike(chain, contract_size=contract_size)
+    if prof.empty:
+        return pd.DataFrame(columns=cols)
+
+    prof = prof.assign(_gross=prof["call_tex"].abs() + prof["put_tex"].abs())
+    rows = []
+    for exp, grp in prof.groupby("expiry", sort=True):
+        by_strike = grp.groupby("strike")["_gross"].sum().sort_index()
+        by_strike = by_strike[by_strike > 0]
+        if by_strike.empty:
+            continue
+        total = float(by_strike.sum())
+        shares = by_strike / total
+        top_strike = float(by_strike.idxmax())
+        top3 = by_strike.sort_values(ascending=False).head(3)
+        rows.append(
+            {
+                "expiry": exp,
+                "underlying_price": float(grp["underlying_price"].iloc[0]),
+                "n_strikes": int(len(by_strike)),
+                "gross_tex": total,
+                "top_strike": top_strike,
+                "top_share": float(by_strike.loc[top_strike] / total),
+                "top3_share": float(top3.sum() / total),
+                "hhi": float((shares**2).sum()),
+            }
+        )
+
+    return pd.DataFrame(rows, columns=cols)

@@ -8,6 +8,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- `theta_concentration` collapses the `theta_exposure_by_strike` profile into
+  `top_share`, `top3_share` and `hhi` on gross dollar theta, the TEX analogue of
+  `vega_concentration`. Theta peaks near the money, so a high reading is the usual
+  case for short-dated expiries where one or two ATM strikes carry the whole day's
+  decay - the strikes a pin most rewards, or hurts, the writing side.
 - `vega_concentration` collapses the `vega_exposure_by_strike` profile into
   `top_share`, `top3_share` and `hhi` on gross dollar vega, the VEX analogue of
   `gamma_concentration`. Where gamma bunches at spot, vega bunches out in the

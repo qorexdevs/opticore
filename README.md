@@ -216,6 +216,7 @@ oc.vega_concentration(enriched)  # => top-strike share and HHI of gross vega (ho
 # Dealer theta exposure: daily decay the writing side collects or pays
 oc.theta_exposure(enriched)  # => call_tex, put_tex, net_tex, theta_wall_strike
 oc.theta_exposure_by_strike(enriched)  # => the TEX profile per strike, cumulative_net_tex brackets the flip
+oc.theta_concentration(enriched)  # => top-strike share and HHI of gross theta (how pinned the decay is)
 
 # Straddle-implied expected move to each expiry, straight off the ATM vol
 oc.expected_move(chain)  # => atm_iv, expected_move, move_pct and the lower/upper 1-sigma band
